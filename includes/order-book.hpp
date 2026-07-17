@@ -7,7 +7,6 @@
 
 using TotalQuantity = uint64_t;
 struct PriceLevel {
-    Price price;
     Quantity order_count;
     Index head;
     Index tail;
@@ -23,8 +22,6 @@ private:
     ClosedHashMap<Price, PriceLevel, MAX_PRICE_LEVELS> price_levels;
     ClosedHashMap<OrderID, Index, MAX_CONCURRENT_ORDERS> order_map;
     std::set<Price> prices;
-
-    
 
 public:
     void add(Order&& order);
