@@ -85,7 +85,7 @@ public:
     void add(const Key& key, Value value);
     void add_on_saved_index(const Key& key, Value value);
     bool remove(const Key& key);
-    bool remove_on_saved_index();
+    void remove_on_saved_index();
 
     OptionalValue find(const Key& key);
     OptionalValue find_then_add(const Key& key);
@@ -113,7 +113,7 @@ bool ClosedHashMap<Key, Value, CAPACITY>::remove(const Key& key) {
 }
 
 template<Hashable Key, typename Value, size_t CAPACITY>
-bool ClosedHashMap<Key, Value, CAPACITY>::remove_on_saved_index() {
+void ClosedHashMap<Key, Value, CAPACITY>::remove_on_saved_index() {
     occupied[saved] = SlotStatus::Tombstone;
 }
 

@@ -1,4 +1,29 @@
 #include "order-book.hpp"
+#include <print>
+
+/*
+For now, these simply print to std::cout
+Later, will write to shared memory region via SeqLock + std::atomic
+*/
+void OrderBook::publish_new_best_bid() {
+	std::println(
+		"New Best Bid\n"
+		"-------------"
+		"\t Best Bid \t Price {} \t Quantity {}\n"
+		"\t Best Offer \t Price {} \t Quantity {}\n",
+		best_bid.price, best_bid.quantity, best_offer.price, best_offer.quantity
+	);
+}
+
+void OrderBook::publish_new_best_offer() {
+	std::println(	
+		"New Best Offer\n"
+		"-------------"
+		"\t Best Bid \t Price {} \t Quantity {}\n"
+		"\t Best Offer \t Price {} \t Quantity {}\n",
+		best_bid.price, best_bid.quantity, best_offer.price, best_offer.quantity
+	);
+}
 
 void OrderBook::update_best_bid_add(Order& order) {
     if(order.price > best_bid.price) {
@@ -35,8 +60,8 @@ void OrderBook::update_bbo_add(Order& order) {
 
 void OrderBook::update_best_bid_reduce(Order& order) {
     if(order.price == best_bid.price && order.quantity == best_bid.quantity) {
-        best_bid.price = *bids.begin();
-        best_bid.quantity = price_levels.find(best_bid.price)->get().total_quantity;
+        best_bid.price = (!bids.empty()) ? *bids.begin() : NO_BID_OR_OFFER;
+        best_bid.quantity = (!bids.empty()) ? price_levels.find(best_bid.price)->get().total_quantity : 0;
         publish_new_best_offer();
     }
     else if(order.price == best_bid.price) {
@@ -47,8 +72,8 @@ void OrderBook::update_best_bid_reduce(Order& order) {
 
 void OrderBook::update_best_offer_reduce(Order& order) {
     if(order.price == best_offer.price && order.quantity == best_offer.quantity) {
-        best_offer.price = *offers.begin();
-        best_offer.quantity = price_levels.find(best_offer.price)->get().total_quantity;
+        best_offer.price = (!bids.empty()) ? *offers.begin() : NO_BID_OR_OFFER;
+        best_offer.quantity = (!bids.empty()) ? price_levels.find(best_offer.price)->get().total_quantity : 0;
         publish_new_best_offer();
     }
     else if(order.price == best_bid.price) {
@@ -175,4 +200,12 @@ void OrderBook::trade(OrderID resting_order_id, Quantity quantity) {
         price_level.total_quantity -= quantity;
 		update_bbo_reduce(order);
     }
+}
+
+void OrderBook::cancel(Order order) {
+    cancel(order.order_id);
+}
+
+void OrderBook::trade(Order order) {
+    trade(order.order_id, order.quantity);
 }

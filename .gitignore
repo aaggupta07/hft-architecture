@@ -54,3 +54,7 @@ compile_commands.json
 *.log
 *.bak
 *.swp
+
+# Debug
+*.dSYM/*
+test/*.txt

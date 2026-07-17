@@ -9,6 +9,7 @@ class OrderBook {
 private:
     static constexpr size_t MAX_PRICE_LEVELS = 1 << 13;
     static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 20;
+    static constexpr Price NO_BID_OR_OFFER = 0;
 
     struct BestOrderInfo {
         Price price = 0;
@@ -50,6 +51,9 @@ private:
 
 public:
     void add(Order order);
+    void cancel(Order order);
+    void trade(Order order);
+
     void cancel(OrderID resting_order_id);
     void trade(OrderID resting_order_id, Quantity quantity);
 };

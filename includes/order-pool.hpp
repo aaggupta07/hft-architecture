@@ -22,8 +22,8 @@ struct Order {
     OrderID order_id;
     Price price;
     Quantity quantity;
-    Index previous;
-    Index next;
+    Index previous = NULL_INDEX;
+    Index next = NULL_INDEX;
     Side side;
 };
 
