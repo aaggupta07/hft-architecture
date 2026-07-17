@@ -6,22 +6,28 @@ For now, these simply print to std::cout
 Later, will write to shared memory region via SeqLock + std::atomic
 */
 void OrderBook::publish_new_best_bid() {
-	std::println(
+	std::string best_bid_price      = (best_bid.price == NO_BID)        ? "None" : std::to_string(best_bid.price);
+    std::string best_offer_price    = (best_offer.price == NO_OFFER)    ? "None" : std::to_string(best_offer.price);
+    
+    std::println(
 		"New Best Bid\n"
-		"-------------"
+		"-------------\n"
 		"\t Best Bid \t Price {} \t Quantity {}\n"
 		"\t Best Offer \t Price {} \t Quantity {}\n",
-		best_bid.price, best_bid.quantity, best_offer.price, best_offer.quantity
+		best_bid_price, best_bid.quantity, best_offer_price, best_offer.quantity
 	);
 }
 
 void OrderBook::publish_new_best_offer() {
+    std::string best_bid_price      = (best_bid.price == NO_BID)        ? "None" : std::to_string(best_bid.price);
+    std::string best_offer_price    = (best_offer.price == NO_OFFER)    ? "None" : std::to_string(best_offer.price);
+
 	std::println(	
 		"New Best Offer\n"
-		"-------------"
+		"-------------\n"
 		"\t Best Bid \t Price {} \t Quantity {}\n"
 		"\t Best Offer \t Price {} \t Quantity {}\n",
-		best_bid.price, best_bid.quantity, best_offer.price, best_offer.quantity
+		best_bid_price, best_bid.quantity, best_offer_price, best_offer.quantity
 	);
 }
 
@@ -60,24 +66,24 @@ void OrderBook::update_bbo_add(Order& order) {
 
 void OrderBook::update_best_bid_reduce(Order& order) {
     if(order.price == best_bid.price && order.quantity == best_bid.quantity) {
-        best_bid.price = (!bids.empty()) ? *bids.begin() : NO_BID_OR_OFFER;
+        best_bid.price = (!bids.empty()) ? *bids.begin() : NO_BID;
         best_bid.quantity = (!bids.empty()) ? price_levels.find(best_bid.price)->get().total_quantity : 0;
-        publish_new_best_offer();
+        publish_new_best_bid();
     }
     else if(order.price == best_bid.price) {
         best_bid.quantity -= order.quantity;
-        publish_new_best_offer();
+        publish_new_best_bid();
     }
 }
 
 void OrderBook::update_best_offer_reduce(Order& order) {
     if(order.price == best_offer.price && order.quantity == best_offer.quantity) {
-        best_offer.price = (!bids.empty()) ? *offers.begin() : NO_BID_OR_OFFER;
-        best_offer.quantity = (!bids.empty()) ? price_levels.find(best_offer.price)->get().total_quantity : 0;
+        best_offer.price = (!offers.empty()) ? *offers.begin() : NO_OFFER;
+        best_offer.quantity = (!offers.empty()) ? price_levels.find(best_offer.price)->get().total_quantity : 0;
         publish_new_best_offer();
     }
-    else if(order.price == best_bid.price) {
-        best_bid.quantity -= order.quantity;
+    else if(order.price == best_offer.price) {
+        best_offer.quantity -= order.quantity;
         publish_new_best_offer();
     }
 }
@@ -163,7 +169,11 @@ void OrderBook::detach(const Order& order, PriceLevel& price_level) {
 void OrderBook::purge_order(OrderID resting_order_id) {
     Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
+    purge_order(order_index, order);
+}
 
+// REQUIRES: order_map to be advanced to order_id via `find_then_remove()`
+void OrderBook::purge_order(Index order_index, Order& order) {
     PriceLevel& price_level = price_levels.find_then_remove(order.price)->get();
     price_level.total_quantity -= order.quantity;
     if(price_level.total_quantity == 0) {
@@ -192,13 +202,16 @@ void OrderBook::trade(OrderID resting_order_id, Quantity quantity) {
     Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
     if(order.quantity == quantity) {
-        purge_order(resting_order_id);
+        purge_order(order_index, order);
     }
     else {
         PriceLevel& price_level = price_levels.find(order.price)->get();
-        order.quantity -= quantity;
+        Quantity new_order_quantity = order.quantity - quantity;
         price_level.total_quantity -= quantity;
+
+        order.quantity = quantity;              // Mark order with delta for BBO update
 		update_bbo_reduce(order);
+        order.quantity = new_order_quantity;    // Restore true order quantity
     }
 }
 

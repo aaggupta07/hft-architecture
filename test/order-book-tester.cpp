@@ -46,16 +46,19 @@ bool parse_and_execute(const std::string& string_to_parse, OrderBook& order_book
 }
 
 int main() {
-    constexpr std::string file_name = "order-book-queries.txt";
+    constexpr const char* file_name = "./test/order-book-queries.txt";
     std::ifstream ifs{file_name};
 
     OrderBook order_book;
 
     std::string line;
     std::getline(ifs, line); // Discard headers
-    
+
+    size_t counter = 0;
     while(std::getline(ifs, line)) {
+        std::println("Order Book Action # {}", ++counter);
         parse_and_execute(line, order_book);
+
     }
     return 0;
 }

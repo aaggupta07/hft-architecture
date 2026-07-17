@@ -4,15 +4,17 @@
 #include "order-pool.hpp"
 #include "closed-hash-map.hpp"
 #include <set>
+#include <limits>
 
 class OrderBook {
 private:
-    static constexpr size_t MAX_PRICE_LEVELS = 1 << 13;
-    static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 20;
-    static constexpr Price NO_BID_OR_OFFER = 0;
+    static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
+    static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 14;
+    static constexpr Price NO_BID = std::numeric_limits<Price>::min();
+    static constexpr Price NO_OFFER = std::numeric_limits<Price>::max();
 
     struct BestOrderInfo {
-        Price price = 0;
+        Price price;
         Quantity quantity = 0;
     };
 
@@ -29,11 +31,12 @@ private:
     
     std::set<Price, std::greater<>> bids;
     std::set<Price> offers;
-    BestOrderInfo best_bid;
-    BestOrderInfo best_offer;
+    BestOrderInfo best_bid {NO_BID, 0};
+    BestOrderInfo best_offer {NO_OFFER, 0};
 
     void detach(const Order& order, PriceLevel& price_level);
     void purge_order(OrderID resting_order_id);
+    void purge_order(Index order_index, Order& order);
     
     void add_bid_or_offer(Order& order);
     void remove_bid_or_offer(Order& order);
