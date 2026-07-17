@@ -4,28 +4,35 @@
 #include <cstdint>
 #include <limits>
 #include <numeric>
+#include <new>
 
 using OrderID = uint64_t;
 using Price = int32_t;
 using Quantity = uint32_t;
-using Side = char;
 using Index = uint32_t;
 
+// Order: 32 bytes => Typically, two orders packed onto one cache line
 struct Order {
+    enum class Side: bool {
+        Buy,
+        Sell,
+    };
+    
+    static constexpr size_t NULL_INDEX = std::numeric_limits<Index>::max();
     OrderID order_id;
     Price price;
     Quantity quantity;
-    Side side;
     Index previous;
     Index next;
+    Side side;
 };
 
 template<std::size_t CAPACITY>
 class OrderPool {
 private:
-    static constexpr std::size_t NULL_IDX = std::numeric_limits<Index>::max();
+    static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
 
-    Order orders[CAPACITY];
+    alignas (CACHE_LINE_SIZE) Order orders[CAPACITY];
     Index free_stack[CAPACITY];
     Index top_index = CAPACITY;
 
@@ -34,7 +41,7 @@ public:
         std::ranges::iota(free_stack, 0);
     }
 
-    Index allocate(Order&& order) {
+    Index allocate(Order order) {
         Index order_idx = free_stack[--top_index];
         orders[order_idx] = order;
         return order_idx;
