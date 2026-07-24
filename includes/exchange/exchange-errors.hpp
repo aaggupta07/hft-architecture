@@ -3,10 +3,10 @@
 
 namespace exchange {
 enum class Error {
-    OrderGenerateError,
-    SendError,
+    OrderGenerate,
+    StartBroadcast,
+    Send,
     RetransmitCacheFull,
-
 };
 }
 

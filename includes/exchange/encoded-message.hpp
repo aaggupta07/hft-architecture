@@ -2,15 +2,20 @@
 #include <array>
 #include <span>
 #include <algorithm>
+#include <cassert>
 
 class exchange::EncodedMessage {
 private:
     const MessageHeader header_;
-    std::array<Byte, MAX_MESSAGE_BYTES + sizeof(header_)> buffer_;
+    static constexpr size_t MAX_WIRE_SIZE = MAX_MESSAGE_BYTES + sizeof(header_);
+
+    std::array<Byte, MAX_WIRE_SIZE> buffer_;
+	
 public:
     EncodedMessage(MessageHeader header, std::span<Byte> payload)
         : header_(header)
     { 
+    	assert(payload.size() <= MAX_MESSAGE_BYTES);
         std::ranges::copy(payload, buffer_.data() + sizeof(header_));
 
     }
@@ -23,5 +28,5 @@ public:
         return std::span{buffer_}.subspan(sizeof(header_), header_.payload_length);
     }
 
-    std::array<Byte, sizeof(header_) + MAX_MESSAGE_BYTES> serialize();
+    std::array<Byte, MAX_WIRE_SIZE> serialize();
 };
