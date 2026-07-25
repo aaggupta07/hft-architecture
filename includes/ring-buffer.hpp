@@ -23,23 +23,24 @@
  * - T is trivially copyable and destroyable.
  * - std::atomic<size_t> is lock-free.
  */
-template <typename T, std::size_t CAPACITY>
+template <typename T, size_t CAPACITY>
 class SharedRingBuffer {
+private:
     static_assert(CAPACITY != 0 && (CAPACITY & (CAPACITY - 1)) == 0,
                   "CAPACITY must be a non-zero power of 2");
     static_assert(std::is_trivially_copyable_v<T>,
                   "T must be trivially copyable for shared-memory IPC");
     static_assert(std::is_trivially_destructible_v<T>,
                   "T must be trivially destructible for shared-memory IPC");
-    static_assert(std::atomic<std::size_t>::is_always_lock_free,
-                  "Shared-memory atomics must be lock-free");
+    static_assert(std::atomic<size_t>::is_always_lock_free,
+                  "std::atomic<size_t> must be lock-free");
 
     using Clock = std::chrono::steady_clock;
     using TimeOut = std::chrono::time_point<Clock>;
     using milliseconds = std::chrono::milliseconds;
 
-    static constexpr std::size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
-    static constexpr std::size_t MASK = CAPACITY - 1;
+    static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
+    static constexpr size_t MASK = CAPACITY - 1;
     static constexpr milliseconds DEFAULT_TIMEOUT{1};
 
     struct alignas(T) Slot {
@@ -48,26 +49,26 @@ class SharedRingBuffer {
 
     // Keep the ownership indices on distinct cache lines.  All remaining
     // state is position independent, so mappings may have different bases.
-    alignas(CACHE_LINE_SIZE) std::atomic<std::size_t> head_{0};
-    alignas(CACHE_LINE_SIZE) std::atomic<std::size_t> tail_{0};
+    alignas(CACHE_LINE_SIZE) std::atomic<size_t> head_{0};
+    alignas(CACHE_LINE_SIZE) std::atomic<size_t> tail_{0};
     alignas(CACHE_LINE_SIZE) std::array<Slot, CAPACITY> buffer_{};
 
-    inline static constexpr bool empty(std::size_t head, std::size_t tail) noexcept {
+    inline static constexpr bool empty(size_t head, size_t tail) noexcept {
         return head == tail;
     }
 
-    inline static constexpr bool full(std::size_t head, std::size_t tail) noexcept {
+    inline static constexpr bool full(size_t head, size_t tail) noexcept {
         return tail - head == CAPACITY;
     }
 
-    inline constexpr T* storage_slot(std::size_t sequence) noexcept {
+    inline constexpr T* storage_slot(size_t sequence) noexcept {
         return reinterpret_cast<T*>(buffer_[sequence & MASK].storage);
     }
 
     template <typename U>
     bool try_push_internal(U&& item) {
-        const std::size_t current_tail = tail_.load(std::memory_order_relaxed);
-        if (full(head_.load(std::memory_order_acquire), current_tail)) {
+        const size_t current_tail = tail_.load(std::memory_order_acquire);
+        if (full(head_.load(std::memory_order_relaxed), current_tail)) {
             return false;
         }
 
@@ -111,8 +112,8 @@ public:
     }
 
     std::optional<T> try_pop() {
-        const std::size_t current_head = head_.load(std::memory_order_relaxed);
-        if (empty(current_head, tail_.load(std::memory_order_acquire))) {
+        const size_t current_head = head_.load(std::memory_order_acquire);
+        if (empty(current_head, tail_.load(std::memory_order_relaxed))) {
             return std::nullopt;
         }
 
@@ -146,7 +147,7 @@ public:
                     tail_.load(std::memory_order_relaxed));
     }
 
-    static constexpr std::size_t capacity() noexcept { return CAPACITY; }
+    static constexpr size_t capacity() noexcept { return CAPACITY; }
 };
 
 #endif
