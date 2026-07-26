@@ -35,7 +35,7 @@ private:
 	void put_item_internal(T&& item);
 	
 public:
-	CircularCache() = default;
+	constexpr CircularCache() = default;
 
 	enum class CacheError {
 		DataTooOld,

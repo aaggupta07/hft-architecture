@@ -3,10 +3,23 @@
 
 namespace exchange {
 enum class Error {
-    OrderGenerate,
     StartBroadcast,
     Send,
-    RetransmitCacheFull,
+
+    PacketTooOld,
+	InvalidPacket,
+
+	StartRetransmitServer,
+	AddressInfo,
+	SetSocketNonblocking,
+	ClientConnectionClosed,
+	WouldBlock,
+	ReceiveFromClient,
+	SendToClient,
+
+	RegisterEvent,
+	UnregisterEvent,
+	EventQueueError,
 };
 }
 

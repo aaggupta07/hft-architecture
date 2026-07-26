@@ -5,11 +5,9 @@
 #include <cassert>
 
 class exchange::EncodedMessage {
-private:
-    const MessageHeader header_;
-    static constexpr size_t MAX_WIRE_SIZE = MAX_MESSAGE_BYTES + sizeof(header_);
-
-    std::array<Byte, MAX_WIRE_SIZE> buffer_;
+private: 	MessageHeader header_;
+public: 	static constexpr size_t MAX_WIRE_SIZE = MAX_MESSAGE_BYTES + sizeof(header_);
+private: 	std::array<Byte, MAX_WIRE_SIZE> buffer_;
 	
 public:
     EncodedMessage(MessageHeader header, std::span<Byte> payload)
