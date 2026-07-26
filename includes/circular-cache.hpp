@@ -37,37 +37,37 @@ private:
 public:
 	constexpr CircularCache() = default;
 
-	enum class CacheError {
+	enum class Error {
 		DataTooOld,
 		DataDoesNotExist,
 		ConcurrentWrite,
 	};
 
-	std::expected<T, CacheError> try_get_item	(Index index) const;
-	std::expected<T, CacheError> wait_get_item	(Index index) const;
+	std::expected<T, Error> try_get_item	(Index index) const;
+	std::expected<T, Error> wait_get_item	(Index index) const;
 	void 					put_item(T&& item) 			{	put_item_internal(std::move(item));	};
 	void					put_item(const T& item)		{	put_item_internal(item); };
 };
 
 template<typename T, size_t CAPACITY>
-auto CircularCache<T, CAPACITY>::try_get_item(Index item_index) const -> std::expected<T, CacheError> {
+auto CircularCache<T, CAPACITY>::try_get_item(Index item_index) const -> std::expected<T, Error> {
 	Index read_index = item_index & MASK;
 	Index seq_before = sequence_[read_index].load(std::memory_order_acquire);
 	if(seq_before == IS_LOCKED) {
-		return std::unexpected(CacheError::ConcurrentWrite);
+		return std::unexpected(Error::ConcurrentWrite);
 	}
 	if(seq_before < item_index) {
-		return std::unexpected(CacheError::DataDoesNotExist);
+		return std::unexpected(Error::DataDoesNotExist);
 	}
 	if(seq_before > item_index) {
-		return std::unexpected(CacheError::DataTooOld);
+		return std::unexpected(Error::DataTooOld);
 	}
 	
 	T item = buffer_[read_index].load(std::memory_order_relaxed);
 
 	Index seq_after = sequence_[read_index].load(std::memory_order_acquire);
 	if(seq_before != seq_after) {
-		return std::unexpected(CacheError::ConcurrentWrite);
+		return std::unexpected(Error::ConcurrentWrite);
 	}
 
 	return item;
@@ -83,9 +83,9 @@ void CircularCache<T, CAPACITY>::put_item_internal(T&& item) {
 }
 
 template<typename T, size_t CAPACITY>
-auto CircularCache<T, CAPACITY>::wait_get_item(Index item_index) const -> std::expected<T, CacheError> {
+auto CircularCache<T, CAPACITY>::wait_get_item(Index item_index) const -> std::expected<T, Error> {
 	auto result = try_get_item(item_index);
-	while(!result && result.error() == CacheError::ConcurrentWrite) {
+	while(!result && result.error() == Error::ConcurrentWrite) {
 		result = try_get_item(item_index);
 	}
 	return result;

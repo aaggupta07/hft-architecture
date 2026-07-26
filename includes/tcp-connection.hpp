@@ -79,7 +79,7 @@ public:
 		}
 	}
 
-	void push(std::span<Byte> bytes) {
+	constexpr void save(const std::span<const Byte> bytes) {
 		assert(connection_status_ == Status::Clear || connection_status_ == Status::SavedMessage);
 		assert(bytes.size() < buffer_.size() - head_);
 		std::ranges::copy(bytes, buffer_.data() + head_);

@@ -1,3 +1,6 @@
+#ifndef ENCODED_MESSAGE_HPP
+#define ENCODED_MESSAGE_HPP
+
 #include "protocol.hpp"
 #include <array>
 #include <span>
@@ -26,5 +29,11 @@ public:
         return std::span{buffer_}.subspan(sizeof(header_), header_.payload_length);
     }
 
+	const std::span<const Byte> message() const noexcept {
+		return std::span{buffer_}.subspan(0, sizeof(header_) + header_.payload_length);
+	}
+
     std::array<Byte, MAX_WIRE_SIZE> serialize();
 };
+
+#endif

@@ -8,6 +8,7 @@ enum class Error {
 
     PacketTooOld,
 	InvalidPacket,
+	PacketUnavailable,
 
 	StartRetransmitServer,
 	AddressInfo,
