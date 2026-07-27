@@ -56,13 +56,15 @@ private:
 	static 	void					 		unregister				(int kq, int socket_fd) noexcept;
 
 	static 	std::expected<SocketFD, Error> 	get_listener			();
+
 			std::expected<SocketFD, Error> 	get_connected_socket	();
 			std::expected<void, Error> 		handle_new_connections	();
 			std::expected<void, Error> 		stream_packets			(SavedConnection& client);
 			std::expected<void, Error> 		receive_request			(SavedConnection& client);
 			std::expected<void, Error> 		handle_request			(SocketFD connected_socket);
 			std::expected<void, Error> 		run_event_loop			();
-	
+
+			void 							notify_and_close		(SavedConnection& client, const Error& error) noexcept; // best effort
 			void							close_client			(SavedConnection& client) noexcept;
 			void 							close_server			() noexcept;
 

@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <cassert>
 #include <print>
+#include <tuple>
 
 namespace exchange {
 
@@ -113,6 +114,18 @@ auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 	return new_socket;
 }
 
+void RetransmitServer::notify_and_close(SavedConnection& client, const Error& error) noexcept{
+	MessageHeader error_header {
+		.sequence_number = 0,
+		.payload_length = static_cast<Length>(error),
+	};
+	auto message = EncodedMessage(error_header, {});
+	client.connection.clear();
+	client.connection.save(message.serialize());
+	std::ignore = client.connection.send();
+	close_client(client);
+}
+
 void RetransmitServer::close_client(SavedConnection& client) noexcept {
 	if(event_queue_ >= 0) unregister(event_queue_, client.connection.socket());
 	client.connection.close();
@@ -140,14 +153,13 @@ auto RetransmitServer::initialize() -> std::expected<void, Error> {
 	return register_read_event(event_queue_, socket_fd_);
 }
 
-// TODO: transmit Error::Server to client
 void RetransmitServer::close_server() noexcept {
 	if(socket_fd_ >= 0) {
 		close(socket_fd_);
 		socket_fd_ = INVALID;
 	}
 	for(SavedConnection& client: connection_buffers) {
-		close_client(client);
+		notify_and_close(client, Error::ServerFatal);
 	}
 	if(event_queue_ >= 0) {
 		close(event_queue_);
@@ -174,14 +186,12 @@ auto RetransmitServer::get_connected_socket() -> std::expected<SocketFD, Error> 
 
 	auto result = set_socket_nonblocking(connected_socket);
 	if(!result) {
-		// TODO: Message -> ClientConnection
 		close(connected_socket);
 		return std::unexpected(Error::SetSocketNonblocking);
 	}
 
 	result = register_read_event(event_queue_, connected_socket);
 	if(!result) {
-		// TODO: Message -> ClientConnection
 		close(connected_socket);
 		return std::unexpected(Error::RegisterEvent);
 	}
@@ -237,8 +247,7 @@ auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
 
 			// Error with client event
 			if((event.flags & EV_ERROR) && static_cast<SocketFD>(event.ident) != socket_fd_) {
-				// TODO: message client
-				close_client(connection_buffers[event.ident]);
+				notify_and_close(connection_buffers[event.ident], Error::ClientConnection);
 				continue;
 			}
 			// Error with listener (fatal)
@@ -345,8 +354,7 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 							close_client(client);
 							return std::unexpected(result.error());
 						case Error::ReceiveFromClient:
-							// TODO: Mesage client w/ error code (EncodedMessage -> SequenceID = 0)
-							close_client(client);
+							notify_and_close(client, Error::ClientConnection);
 							return std::unexpected(result.error());
 						default:
 							assert(false && "[TCP Retransmit] Handler (receive request): Unreachable");
@@ -366,8 +374,7 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 							{
 								auto event_result = register_write_event(event_queue_, connected_socket);
 								if(!event_result) {
-									// TODO: Message client w/ Error -> bake this into close_client()
-									close_client(client);
+									notify_and_close(client, Error::ClientConnection);
 									return std::unexpected(event_result.error());
 								}
 								return {};
@@ -379,7 +386,7 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 						case Error::InvalidPacket: [[fallthrough]];
 						case Error::PacketUnavailable: [[fallthrough]];
 						case Error::SendToClient:
-							// TODO: Message Client with Error (tie enum class errors to specific values)
+							// In this case, a send failed, so we can't notify the client
 							close_client(client);
 							return std::unexpected(result.error());
 						default:
