@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <span>
+#include "order.hpp"
 
 namespace exchange {
 
@@ -19,6 +20,19 @@ struct MessageHeader {
     Length payload_length;
 
     void serialize(std::span<Byte> buffer) const;
+};
+
+struct OrderRequest {
+	enum class Type: uint8_t {
+		Buy,
+		Sell,
+		Cancel,
+	};
+
+	Order::ID order_id;			// Used for CANCEL requests
+	Order::Price price;			// Used for BUY/SELL requests
+	Order::Quantity quantity; 	// Used for BUY/SELL requests
+	Type type;
 };
 
 class CentralLimitOrderBook;

@@ -8,7 +8,10 @@
 
 class BookState {
 public:
-	enum class BookUpdate {
+	static constexpr Order::Price NO_BID = std::numeric_limits<Order::Price>::min();
+    static constexpr Order::Price NO_OFFER = std::numeric_limits<Order::Price>::max();
+
+	enum class Update {
 		NoChange,
 		NewBestBid,
 		NewBestOffer,
@@ -19,13 +22,18 @@ public:
         Order::Quantity quantity = 0;
     };
 
+	struct HeadOrder {
+		Order::ID order_id;
+		Order::Price price;
+		Order::Quantity quantity = 0;
+	};
+
 	struct OrderSnapshot {
 		BestOrderInfo best_bid;
 		BestOrderInfo best_offer;
 	};
 
-	static constexpr Order::Price NO_BID = std::numeric_limits<Order::Price>::min();
-    static constexpr Order::Price NO_OFFER = std::numeric_limits<Order::Price>::max();
+
 
 private:
     static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
@@ -33,14 +41,14 @@ private:
 
     using TotalQuantity = uint64_t;
     struct PriceLevel {
-        Order::Index head;
-        Order::Index tail;
+        RestingOrder::Index head;
+        RestingOrder::Index tail;
         TotalQuantity total_quantity;
     };
 
     OrderPool<MAX_CONCURRENT_ORDERS> order_pool;
     ClosedHashMap<Order::Price, PriceLevel, MAX_PRICE_LEVELS> price_levels;
-    ClosedHashMap<Order::ID, Order::Index, MAX_CONCURRENT_ORDERS> order_map;
+    ClosedHashMap<Order::ID, RestingOrder::Index, MAX_CONCURRENT_ORDERS> order_map;
     
     std::set<Order::Price, std::greater<>> bids;
     std::set<Order::Price> offers;
@@ -50,32 +58,34 @@ private:
 		.best_offer {NO_OFFER, 0},
 	};
 
-    void detach(const Order& order, PriceLevel& price_level);
-    BookUpdate purge_order(Order::ID resting_order_id);
-    BookUpdate purge_order(Order::Index order_index, const Order& order);
+    void detach(const RestingOrder& order, PriceLevel& price_level);
+    Update purge_order(Order::ID resting_order_id);
+    Update purge_order(RestingOrder::Index order_index, const RestingOrder& resting_order);
     
     void add_bid_or_offer(const Order& order);
     void remove_bid_or_offer(const Order& order);
 
-    BookUpdate update_bbo_add(const Order& order);
-    BookUpdate update_best_bid_add(const Order& order);
-    BookUpdate update_best_offer_add(const Order& order);
+    Update update_bbo_add(const Order& order);
+    Update update_best_bid_add(const Order& order);
+    Update update_best_offer_add(const Order& order);
 
-    BookUpdate update_bbo_reduce(const Order& order);
-    BookUpdate update_best_bid_reduce(const Order& order);
-    BookUpdate update_best_offer_reduce(const Order& order);
+    Update update_bbo_reduce(const Order& order);
+    Update update_best_bid_reduce(const Order& order);
+    Update update_best_offer_reduce(const Order& order);
 
 public:
-    BookUpdate add(const Order& order);
-    BookUpdate cancel(const Order& order);
-    BookUpdate trade(const Order& order);
+    Update add		(const MarketEvent& event);
+    Update cancel	(const MarketEvent& event);
+    Update trade	(const MarketEvent& event);
 
-    BookUpdate cancel(Order::ID resting_order_id);
-    BookUpdate trade(Order::ID resting_order_id, Order::Quantity quantity);
+    Update cancel(Order::ID resting_order_id);
+    Update trade(Order::ID resting_order_id, Order::Quantity quantity);
 
-	BookUpdate execute(const Order& order);
+	Update execute(const MarketEvent& event);
 
 	constexpr OrderSnapshot snapshot() const noexcept { return bbo; }
+	constexpr HeadOrder best_opposing_order(Order::Side side) const noexcept;
+	constexpr bool order_exists(Order::ID order_id) const noexcept;
 };
 
 

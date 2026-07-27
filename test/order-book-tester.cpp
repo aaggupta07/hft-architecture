@@ -24,12 +24,12 @@ CANCEL [orderID]
 TRADE [orderID] [Quantity]
 */
 
-void log_update(const BookState::BookUpdate& update, const BookState& order_book) {
+void log_update(const BookState::Update& update, const BookState& order_book) {
 	static size_t action_counter = 0;
 
 	std::println("Order Book Action # {}", ++action_counter);
 	switch(update) {
-		using enum BookState::BookUpdate;
+		using enum BookState::Update;
 
 		case NoChange:
 			break;
@@ -52,28 +52,28 @@ void log_update(const BookState::BookUpdate& update, const BookState& order_book
 
 
 bool parse_and_execute(const std::string& string_to_parse, BookState& order_book) {
-	static const std::unordered_map<std::string, Order::Type> registry {
-		{"ADD", Order::Type::Add},
-		{"CANCEL", Order::Type::Cancel},
-		{"TRADE", Order::Type::Trade},
+	static const std::unordered_map<std::string, MarketEvent::Type> registry {
+		{"ADD", MarketEvent::Type::Add},
+		{"CANCEL", MarketEvent::Type::Cancel},
+		{"TRADE", MarketEvent::Type::Trade},
 	};
 
     std::stringstream parse(string_to_parse);
     std::string verb;
-    Order new_order;
-    parse >> verb >> new_order.order_id;
+    MarketEvent new_event;
+    parse >> verb >> new_event.order.order_id;
 	
 	if(!registry.contains(verb)) {
 		std::println(stderr, "[Parser] Verb {} unknown.", verb);
         return false;
 	}
 
-	new_order.type = registry.at(verb);
+	new_event.type = registry.at(verb);
 
-	switch(new_order.type) {
-		case Order::Type::Add:
+	switch(new_event.type) {
+		case MarketEvent::Type::Add:
 			char side;
-			parse >> new_order.price >> new_order.quantity >> side;
+			parse >> new_event.order.price >> new_event.order.quantity >> side;
 
 			static const std::unordered_map<char, Order::Side> side_map {
 				{'B', Order::Side::Buy},
@@ -85,19 +85,19 @@ bool parse_and_execute(const std::string& string_to_parse, BookState& order_book
 				return false;
 			}
 
-			new_order.side = side_map.at(side);
-			new_order.type = Order::Type::Add;
+			new_event.order.side = side_map.at(side);
+			new_event.type = MarketEvent::Type::Add;
 			break;
-		case Order::Type::Cancel:
-			new_order.type = Order::Type::Cancel;
+		case MarketEvent::Type::Cancel:
+			new_event.type = MarketEvent::Type::Cancel;
 			break;
-		case Order::Type::Trade:
-			parse >> new_order.quantity;
-        	new_order.type = Order::Type::Trade;
+		case MarketEvent::Type::Trade:
+			parse >> new_event.order.quantity;
+        	new_event.type = MarketEvent::Type::Trade;
 			break;
 	}
 
-	BookState::BookUpdate update = order_book.execute(new_order);
+	BookState::Update update = order_book.execute(new_event);
 	log_update(update, order_book);
 
     return true;

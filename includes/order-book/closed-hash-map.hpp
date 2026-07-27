@@ -37,6 +37,7 @@ private:
 
     using Index = size_t;
     using OptionalValue = std::optional<std::reference_wrapper<Value>>;
+	using ConstOptionalValue = std::optional<std::reference_wrapper<const Value>>;
     
     static constexpr size_t NULL_INDEX = std::numeric_limits<size_t>::max();
     static constexpr size_t MASK = CAPACITY - 1;
@@ -51,7 +52,7 @@ private:
         return hash(key) & MASK;
     }
 
-    Index probe_new(const Key& key) {
+    Index probe_new(const Key& key) const {
         Index idx = hash(key);
         while(occupied[idx] == SlotStatus::Occupied) {
             idx = (idx + 1) & MASK;
@@ -59,7 +60,7 @@ private:
         return idx;
     }
 
-    Index probe_existing(const Key& key) {
+    Index probe_existing(const Key& key) const {
         Index idx = hash(key);
         while(occupied[idx] != SlotStatus::Empty) {
             if(occupied[idx] == SlotStatus::Occupied && slots[idx].key == key) {
@@ -101,6 +102,7 @@ public:
     void remove_on_saved_index();
 
     OptionalValue find(const Key& key);
+	ConstOptionalValue find(const Key& key) const;
     OptionalValue find_then_add(const Key& key);
     OptionalValue find_then_remove(const Key& key);
 };
@@ -137,14 +139,21 @@ template<Hashable Key, typename Value, size_t CAPACITY>
 auto ClosedHashMap<Key, Value, CAPACITY>::find(const Key& key) -> OptionalValue {
     Index slot_idx = probe_existing(key);
     if(slot_idx == NULL_INDEX) return std::nullopt;
-    return slots[slot_idx].value;
+	return std::ref(slots[slot_idx].value);
+}
+
+template<Hashable Key, typename Value, size_t CAPACITY>
+auto ClosedHashMap<Key, Value, CAPACITY>::find(const Key& key) const -> ConstOptionalValue {
+    Index slot_idx = probe_existing(key);
+    if(slot_idx == NULL_INDEX) return std::nullopt;
+	return std::cref(slots[slot_idx].value);
 }
 
 template<Hashable Key, typename Value, size_t CAPACITY>
 auto ClosedHashMap<Key, Value, CAPACITY>::find_then_add(const Key& key) -> OptionalValue {
     Index slot_idx = probe_existing_and_save_tombstone(key);
     if(slot_idx == NULL_INDEX) return std::nullopt;
-    return slots[slot_idx].value;
+    return std::ref(slots[slot_idx].value);
 }
 
 template<Hashable Key, typename Value, size_t CAPACITY>

@@ -12,6 +12,10 @@ enum class Error {
 	ClientConnection	= 4,
 	ServerFatal 		= 5,
 
+	// Public Order Request Errors
+	OrderDoesNotExist 	= 6,
+	InvalidOrderRequest = 7,
+
 	StartBroadcast,
     Send,
 
@@ -79,6 +83,10 @@ struct std::formatter<exchange::Error> {
 				return "RegisterEvent";
 			case EventQueue:
 				return "EventQueue";
+			case OrderDoesNotExist:
+				return "OrderDoesNotExist";
+			case InvalidOrderRequest:
+				return "InvalidOrderRequest";
 		}
 	}
 };

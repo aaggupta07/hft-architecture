@@ -6,7 +6,7 @@
 namespace exchange {
 class MarketRequestGenerator {
 private:
-
+	
 public:
 
 };
