@@ -1,4 +1,4 @@
-#include "order-book.hpp"
+#include "book-state.hpp"
 
 auto BookState::update_best_bid_add(const Order& order) -> BookUpdate {
     if(order.price > bbo.best_bid.price) {
@@ -98,7 +98,7 @@ void BookState::remove_bid_or_offer(const Order& order) {
     - If price improves best_price, update best_price
 */
 auto BookState::add(const Order& order) -> BookUpdate {
-    Index order_index = order_pool.allocate(order);
+    Order::Index order_index = order_pool.allocate(order);
     order_map.add(order.order_id, order_index);
 
     auto result = price_levels.find_then_add(order.price);
@@ -139,14 +139,14 @@ void BookState::detach(const Order& order, PriceLevel& price_level) {
 - Erase the order from the order_map and deallocate it from the order pool
 - Relink the order intrusive linked list
 */
-auto BookState::purge_order(OrderID resting_order_id) -> BookUpdate {
-    Index order_index = order_map.find_then_remove(resting_order_id)->get();
+auto BookState::purge_order(Order::ID resting_order_id) -> BookUpdate {
+    Order::Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
     return purge_order(order_index, order);
 }
 
 // REQUIRES: order_map to be advanced to order_id via `find_then_remove()`
-auto BookState::purge_order(Index order_index, const Order& order) -> BookUpdate {
+auto BookState::purge_order(Order::Index order_index, const Order& order) -> BookUpdate {
     PriceLevel& price_level = price_levels.find_then_remove(order.price)->get();
     price_level.total_quantity -= order.quantity;
     if(price_level.total_quantity == 0) {
@@ -163,7 +163,7 @@ auto BookState::purge_order(Index order_index, const Order& order) -> BookUpdate
 	return update;
 }
 
-auto BookState::cancel(OrderID resting_order_id) -> BookUpdate {
+auto BookState::cancel(Order::ID resting_order_id) -> BookUpdate {
    return purge_order(resting_order_id);
 }
 
@@ -172,8 +172,8 @@ auto BookState::cancel(OrderID resting_order_id) -> BookUpdate {
 - Check the price level and reduce quantity - erase the price level if it hits 0
 - Erase the order from the order_map and deallocate it from the order pool if its quantity hit 0
 */
-auto BookState::trade(OrderID resting_order_id, Quantity quantity) -> BookUpdate {
-    Index order_index = order_map.find_then_remove(resting_order_id)->get();
+auto BookState::trade(Order::ID resting_order_id, Order::Quantity quantity) -> BookUpdate {
+    Order::Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
 
 	// Logically same as purge order from book's perspective
@@ -183,7 +183,7 @@ auto BookState::trade(OrderID resting_order_id, Quantity quantity) -> BookUpdate
 
 	// Partial order removal
 	PriceLevel& price_level = price_levels.find(order.price)->get();
-	Quantity new_order_quantity = order.quantity - quantity;
+	Order::Quantity new_order_quantity = order.quantity - quantity;
 	price_level.total_quantity -= quantity;
 
 	order.quantity = quantity;              // Mark order with delta for BBO update

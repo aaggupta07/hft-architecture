@@ -1,5 +1,5 @@
-#ifndef ORDER_BOOK_HPP
-#define ORDER_BOOK_HPP
+#ifndef BOOK_STATE_HPP
+#define BOOK_STATE_HPP
 
 #include "order-pool.hpp"
 #include "closed-hash-map.hpp"
@@ -15,8 +15,8 @@ public:
 	};
 
     struct BestOrderInfo {
-        Price price;
-        Quantity quantity = 0;
+        Order::Price price;
+        Order::Quantity quantity = 0;
     };
 
 	struct OrderSnapshot {
@@ -24,8 +24,8 @@ public:
 		BestOrderInfo best_offer;
 	};
 
-	static constexpr Price NO_BID = std::numeric_limits<Price>::min();
-    static constexpr Price NO_OFFER = std::numeric_limits<Price>::max();
+	static constexpr Order::Price NO_BID = std::numeric_limits<Order::Price>::min();
+    static constexpr Order::Price NO_OFFER = std::numeric_limits<Order::Price>::max();
 
 private:
     static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
@@ -33,17 +33,17 @@ private:
 
     using TotalQuantity = uint64_t;
     struct PriceLevel {
-        Index head;
-        Index tail;
+        Order::Index head;
+        Order::Index tail;
         TotalQuantity total_quantity;
     };
 
     OrderPool<MAX_CONCURRENT_ORDERS> order_pool;
-    ClosedHashMap<Price, PriceLevel, MAX_PRICE_LEVELS> price_levels;
-    ClosedHashMap<OrderID, Index, MAX_CONCURRENT_ORDERS> order_map;
+    ClosedHashMap<Order::Price, PriceLevel, MAX_PRICE_LEVELS> price_levels;
+    ClosedHashMap<Order::ID, Order::Index, MAX_CONCURRENT_ORDERS> order_map;
     
-    std::set<Price, std::greater<>> bids;
-    std::set<Price> offers;
+    std::set<Order::Price, std::greater<>> bids;
+    std::set<Order::Price> offers;
 
 	OrderSnapshot bbo {
 		.best_bid {NO_BID, 0},
@@ -51,8 +51,8 @@ private:
 	};
 
     void detach(const Order& order, PriceLevel& price_level);
-    BookUpdate purge_order(OrderID resting_order_id);
-    BookUpdate purge_order(Index order_index, const Order& order);
+    BookUpdate purge_order(Order::ID resting_order_id);
+    BookUpdate purge_order(Order::Index order_index, const Order& order);
     
     void add_bid_or_offer(const Order& order);
     void remove_bid_or_offer(const Order& order);
@@ -70,8 +70,8 @@ public:
     BookUpdate cancel(const Order& order);
     BookUpdate trade(const Order& order);
 
-    BookUpdate cancel(OrderID resting_order_id);
-    BookUpdate trade(OrderID resting_order_id, Quantity quantity);
+    BookUpdate cancel(Order::ID resting_order_id);
+    BookUpdate trade(Order::ID resting_order_id, Order::Quantity quantity);
 
 	BookUpdate execute(const Order& order);
 
