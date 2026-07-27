@@ -6,17 +6,30 @@
 #include <set>
 #include <limits>
 
-class OrderBook {
-private:
-    static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
-    static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 14;
-    static constexpr Price NO_BID = std::numeric_limits<Price>::min();
-    static constexpr Price NO_OFFER = std::numeric_limits<Price>::max();
+class BookState {
+public:
+	enum class BookUpdate {
+		NoChange,
+		NewBestBid,
+		NewBestOffer,
+	};
 
     struct BestOrderInfo {
         Price price;
         Quantity quantity = 0;
     };
+
+	struct OrderSnapshot {
+		BestOrderInfo best_bid;
+		BestOrderInfo best_offer;
+	};
+
+	static constexpr Price NO_BID = std::numeric_limits<Price>::min();
+    static constexpr Price NO_OFFER = std::numeric_limits<Price>::max();
+
+private:
+    static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
+    static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 14;
 
     using TotalQuantity = uint64_t;
     struct PriceLevel {
@@ -31,34 +44,38 @@ private:
     
     std::set<Price, std::greater<>> bids;
     std::set<Price> offers;
-    BestOrderInfo best_bid {NO_BID, 0};
-    BestOrderInfo best_offer {NO_OFFER, 0};
+
+	OrderSnapshot bbo {
+		.best_bid {NO_BID, 0},
+		.best_offer {NO_OFFER, 0},
+	};
 
     void detach(const Order& order, PriceLevel& price_level);
-    void purge_order(OrderID resting_order_id);
-    void purge_order(Index order_index, Order& order);
+    BookUpdate purge_order(OrderID resting_order_id);
+    BookUpdate purge_order(Index order_index, const Order& order);
     
-    void add_bid_or_offer(Order& order);
-    void remove_bid_or_offer(Order& order);
+    void add_bid_or_offer(const Order& order);
+    void remove_bid_or_offer(const Order& order);
 
-    void update_bbo_add(Order& order);
-    void update_best_bid_add(Order& order);
-    void update_best_offer_add(Order& order);
+    BookUpdate update_bbo_add(const Order& order);
+    BookUpdate update_best_bid_add(const Order& order);
+    BookUpdate update_best_offer_add(const Order& order);
 
-    void update_bbo_reduce(Order& order);
-    void update_best_bid_reduce(Order& order);
-    void update_best_offer_reduce(Order& order);
-
-    void publish_new_best_bid();
-    void publish_new_best_offer();
+    BookUpdate update_bbo_reduce(const Order& order);
+    BookUpdate update_best_bid_reduce(const Order& order);
+    BookUpdate update_best_offer_reduce(const Order& order);
 
 public:
-    void add(Order order);
-    void cancel(Order order);
-    void trade(Order order);
+    BookUpdate add(const Order& order);
+    BookUpdate cancel(const Order& order);
+    BookUpdate trade(const Order& order);
 
-    void cancel(OrderID resting_order_id);
-    void trade(OrderID resting_order_id, Quantity quantity);
+    BookUpdate cancel(OrderID resting_order_id);
+    BookUpdate trade(OrderID resting_order_id, Quantity quantity);
+
+	BookUpdate execute(const Order& order);
+
+	constexpr OrderSnapshot snapshot() const noexcept { return bbo; }
 };
 
 

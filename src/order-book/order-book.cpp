@@ -1,103 +1,76 @@
 #include "order-book.hpp"
-#include <print>
 
-/*
-For now, these simply print to std::cout
-Later, will write to shared memory region via SeqLock + std::atomic
-*/
-void OrderBook::publish_new_best_bid() {
-	std::string best_bid_price      = (best_bid.price == NO_BID)        ? "None" : std::to_string(best_bid.price);
-    std::string best_offer_price    = (best_offer.price == NO_OFFER)    ? "None" : std::to_string(best_offer.price);
-    
-    std::println(
-		"New Best Bid\n"
-		"-------------\n"
-		"\t Best Bid \t Price {} \t Quantity {}\n"
-		"\t Best Offer \t Price {} \t Quantity {}\n",
-		best_bid_price, best_bid.quantity, best_offer_price, best_offer.quantity
-	);
+auto BookState::update_best_bid_add(const Order& order) -> BookUpdate {
+    if(order.price > bbo.best_bid.price) {
+        bbo.best_bid.price = order.price;
+        bbo.best_bid.quantity = order.quantity;
+        return BookUpdate::NewBestBid;
+    }
+    else if(order.price == bbo.best_bid.price) {
+        bbo.best_bid.quantity += order.quantity;
+        return BookUpdate::NewBestBid;
+    }
+	return BookUpdate::NoChange;
 }
 
-void OrderBook::publish_new_best_offer() {
-    std::string best_bid_price      = (best_bid.price == NO_BID)        ? "None" : std::to_string(best_bid.price);
-    std::string best_offer_price    = (best_offer.price == NO_OFFER)    ? "None" : std::to_string(best_offer.price);
-
-	std::println(	
-		"New Best Offer\n"
-		"-------------\n"
-		"\t Best Bid \t Price {} \t Quantity {}\n"
-		"\t Best Offer \t Price {} \t Quantity {}\n",
-		best_bid_price, best_bid.quantity, best_offer_price, best_offer.quantity
-	);
+auto BookState::update_best_offer_add(const Order& order) -> BookUpdate {
+    if(order.price < bbo.best_offer.price) {
+        bbo.best_offer.price = order.price;
+        bbo.best_offer.quantity = order.quantity;
+        return BookUpdate::NewBestOffer;
+    }
+    else if(order.price == bbo.best_offer.price) {
+        bbo.best_offer.quantity += order.quantity;
+        return BookUpdate::NewBestOffer;
+    }
+	return BookUpdate::NoChange;
 }
 
-void OrderBook::update_best_bid_add(Order& order) {
-    if(order.price > best_bid.price) {
-        best_bid.price = order.price;
-        best_bid.quantity = order.quantity;
-        publish_new_best_bid();
-    }
-    else if(order.price == best_bid.price) {
-        best_bid.quantity += order.quantity;
-        publish_new_best_bid();
-    }
-}
-
-void OrderBook::update_best_offer_add(Order& order) {
-    if(order.price < best_offer.price) {
-        best_offer.price = order.price;
-        best_offer.quantity = order.quantity;
-        publish_new_best_offer();
-    }
-    else if(order.price == best_offer.price) {
-        best_offer.quantity += order.quantity;
-        publish_new_best_offer();
-    }
-}
-
-void OrderBook::update_bbo_add(Order& order) {
+auto BookState::update_bbo_add(const Order& order) -> BookUpdate {
     if(order.side == Order::Side::Buy) {
-        update_best_bid_add(order);
+        return update_best_bid_add(order);
     }
     else {
-        update_best_offer_add(order);
+        return update_best_offer_add(order);
     }
 }
 
-void OrderBook::update_best_bid_reduce(Order& order) {
-    if(order.price == best_bid.price && order.quantity == best_bid.quantity) {
-        best_bid.price = (!bids.empty()) ? *bids.begin() : NO_BID;
-        best_bid.quantity = (!bids.empty()) ? price_levels.find(best_bid.price)->get().total_quantity : 0;
-        publish_new_best_bid();
+auto BookState::update_best_bid_reduce(const Order& order) -> BookUpdate {
+    if(order.price == bbo.best_bid.price && order.quantity == bbo.best_bid.quantity) {
+        bbo.best_bid.price = (!bids.empty()) ? *bids.begin() : NO_BID;
+        bbo.best_bid.quantity = (!bids.empty()) ? price_levels.find(bbo.best_bid.price)->get().total_quantity : 0;
+        return BookUpdate::NewBestBid;
     }
-    else if(order.price == best_bid.price) {
-        best_bid.quantity -= order.quantity;
-        publish_new_best_bid();
+    else if(order.price == bbo.best_bid.price) {
+        bbo.best_bid.quantity -= order.quantity;
+        return BookUpdate::NewBestBid;
     }
+	return BookUpdate::NoChange;
 }
 
-void OrderBook::update_best_offer_reduce(Order& order) {
-    if(order.price == best_offer.price && order.quantity == best_offer.quantity) {
-        best_offer.price = (!offers.empty()) ? *offers.begin() : NO_OFFER;
-        best_offer.quantity = (!offers.empty()) ? price_levels.find(best_offer.price)->get().total_quantity : 0;
-        publish_new_best_offer();
+auto BookState::update_best_offer_reduce(const Order& order) -> BookUpdate {
+    if(order.price == bbo.best_offer.price && order.quantity == bbo.best_offer.quantity) {
+        bbo.best_offer.price = (!offers.empty()) ? *offers.begin() : NO_OFFER;
+        bbo.best_offer.quantity = (!offers.empty()) ? price_levels.find(bbo.best_offer.price)->get().total_quantity : 0;
+        return BookUpdate::NewBestOffer;
     }
-    else if(order.price == best_offer.price) {
-        best_offer.quantity -= order.quantity;
-        publish_new_best_offer();
+    else if(order.price == bbo.best_offer.price) {
+        bbo.best_offer.quantity -= order.quantity;
+        return BookUpdate::NewBestOffer;
     }
+	return BookUpdate::NoChange;
 }
 
-void OrderBook::update_bbo_reduce(Order& order) {
+auto BookState::update_bbo_reduce(const Order& order) -> BookUpdate {
     if(order.side == Order::Side::Buy) {
-        update_best_bid_reduce(order);
+       return update_best_bid_reduce(order);
     }
     else {
-        update_best_offer_reduce(order);
+       return update_best_offer_reduce(order);
     }
 }
 
-void OrderBook::add_bid_or_offer(Order& order) {
+void BookState::add_bid_or_offer(const Order& order) {
     if(order.side == Order::Side::Buy) {
         bids.insert(order.price);
     }
@@ -106,7 +79,7 @@ void OrderBook::add_bid_or_offer(Order& order) {
     }
 }
 
-void OrderBook::remove_bid_or_offer(Order& order) {
+void BookState::remove_bid_or_offer(const Order& order) {
     if(order.side == Order::Side::Buy) {
         bids.erase(order.price);
     }
@@ -124,7 +97,7 @@ void OrderBook::remove_bid_or_offer(Order& order) {
     - If it doesn't exist, create a new price level and insert into the map + prices set
     - If price improves best_price, update best_price
 */
-void OrderBook::add(Order order) {
+auto BookState::add(const Order& order) -> BookUpdate {
     Index order_index = order_pool.allocate(order);
     order_map.add(order.order_id, order_index);
 
@@ -146,10 +119,10 @@ void OrderBook::add(Order order) {
         price_level.tail = order_index;
     }
 
-    update_bbo_add(order);
+    return update_bbo_add(order);
 }
 
-void OrderBook::detach(const Order& order, PriceLevel& price_level) {
+void BookState::detach(const Order& order, PriceLevel& price_level) {
     if(order.previous != Order::NULL_INDEX) {
 		order_pool.get(order.previous).next = order.next;
 	}
@@ -166,14 +139,14 @@ void OrderBook::detach(const Order& order, PriceLevel& price_level) {
 - Erase the order from the order_map and deallocate it from the order pool
 - Relink the order intrusive linked list
 */
-void OrderBook::purge_order(OrderID resting_order_id) {
+auto BookState::purge_order(OrderID resting_order_id) -> BookUpdate {
     Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
-    purge_order(order_index, order);
+    return purge_order(order_index, order);
 }
 
 // REQUIRES: order_map to be advanced to order_id via `find_then_remove()`
-void OrderBook::purge_order(Index order_index, Order& order) {
+auto BookState::purge_order(Index order_index, const Order& order) -> BookUpdate {
     PriceLevel& price_level = price_levels.find_then_remove(order.price)->get();
     price_level.total_quantity -= order.quantity;
     if(price_level.total_quantity == 0) {
@@ -185,12 +158,13 @@ void OrderBook::purge_order(Index order_index, Order& order) {
     }
 
 	order_map.remove_on_saved_index();
-	update_bbo_reduce(order);			// Publish the new BBO if changed
+	BookUpdate update = update_bbo_reduce(order); // Update the BBO
 	order_pool.free(order_index);
+	return update;
 }
 
-void OrderBook::cancel(OrderID resting_order_id) {
-   purge_order(resting_order_id);
+auto BookState::cancel(OrderID resting_order_id) -> BookUpdate {
+   return purge_order(resting_order_id);
 }
 
 /*
@@ -198,27 +172,44 @@ void OrderBook::cancel(OrderID resting_order_id) {
 - Check the price level and reduce quantity - erase the price level if it hits 0
 - Erase the order from the order_map and deallocate it from the order pool if its quantity hit 0
 */
-void OrderBook::trade(OrderID resting_order_id, Quantity quantity) {
+auto BookState::trade(OrderID resting_order_id, Quantity quantity) -> BookUpdate {
     Index order_index = order_map.find_then_remove(resting_order_id)->get();
     Order& order = order_pool.get(order_index);
+
+	// Logically same as purge order from book's perspective
     if(order.quantity == quantity) {
-        purge_order(order_index, order);
+        return purge_order(order_index, order);
     }
-    else {
-        PriceLevel& price_level = price_levels.find(order.price)->get();
-        Quantity new_order_quantity = order.quantity - quantity;
-        price_level.total_quantity -= quantity;
 
-        order.quantity = quantity;              // Mark order with delta for BBO update
-		update_bbo_reduce(order);
-        order.quantity = new_order_quantity;    // Restore true order quantity
-    }
+	// Partial order removal
+	PriceLevel& price_level = price_levels.find(order.price)->get();
+	Quantity new_order_quantity = order.quantity - quantity;
+	price_level.total_quantity -= quantity;
+
+	order.quantity = quantity;              // Mark order with delta for BBO update
+	BookUpdate update = update_bbo_reduce(order);
+	order.quantity = new_order_quantity;    // Restore true order quantity
+	return update;
 }
 
-void OrderBook::cancel(Order order) {
-    cancel(order.order_id);
+auto BookState::cancel(const Order& order) -> BookUpdate {
+    return cancel(order.order_id);
 }
 
-void OrderBook::trade(Order order) {
-    trade(order.order_id, order.quantity);
+auto BookState::trade(const Order& order) -> BookUpdate {
+    return trade(order.order_id, order.quantity);
+}
+
+auto BookState::execute(const Order& order) -> BookUpdate {
+	switch(order.type) {
+		case Order::Type::Add:
+			return add(order);
+		case Order::Type::Cancel:
+			return cancel(order);
+		case Order::Type::Trade:
+			return trade(order);
+		default:
+			assert(false && "[BookState] Execute: Unreachable");
+			std::unreachable();
+	}
 }

@@ -17,6 +17,12 @@ struct Order {
         Buy,
         Sell,
     };
+
+	enum class Type: short {
+		Add,
+		Cancel,
+		Trade,
+	};
     
     static constexpr size_t NULL_INDEX = std::numeric_limits<Index>::max();
     OrderID order_id;
@@ -25,6 +31,7 @@ struct Order {
     Index previous = NULL_INDEX;
     Index next = NULL_INDEX;
     Side side;
+	Type type;
 };
 
 template<std::size_t CAPACITY>
