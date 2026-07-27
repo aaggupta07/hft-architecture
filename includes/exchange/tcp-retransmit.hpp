@@ -32,7 +32,7 @@ private:
 	static constexpr size_t N							= EncodedMessage::MAX_WIRE_SIZE;
 
 	static constexpr size_t DEFAULT_CONNECTION_BUFFERS 	= 5;
-	static constexpr size_t MAX_CONNECTION_BUFFERS 		= 100;
+	static constexpr size_t MAX_TOTAL_CONNECTIONS 		= 25;
 
 	using Cache = CircularCache<EncodedMessage, RETRANSMIT_CACHE_SIZE>;
 	using SocketFD = int;
@@ -43,24 +43,31 @@ private:
 		std::optional<RetransmitRequest> request = std::nullopt;
 	};
 
-	SocketFD socket_fd_ 	= INVALID;
-	EventQueue event_queue_	= INVALID;
+	SocketFD 	socket_fd_ 			= INVALID;
+	EventQueue 	event_queue_		= INVALID;
+	size_t 		current_connections = 0;
+
 	Cache& retransmit_cache_;
 	std::vector<SavedConnection> connection_buffers;
 
 	static 	std::expected<void, Error> 		set_socket_nonblocking	(int socket_fd);
 	static 	std::expected<void, Error> 		register_read_event		(int kq, int socket_fd);
 	static 	std::expected<void, Error> 		register_write_event	(int kq, int socket_fd);
-	static 	void					 		unregister				(int kq, int socket_fd);
+	static 	void					 		unregister				(int kq, int socket_fd) noexcept;
 
 	static 	std::expected<SocketFD, Error> 	get_listener			();
-			std::expected<SocketFD, Error> 	handle_new_connection	();
+			std::expected<SocketFD, Error> 	get_connected_socket	();
+			std::expected<void, Error> 		handle_new_connections	();
 			std::expected<void, Error> 		stream_packets			(SavedConnection& client);
 			std::expected<void, Error> 		receive_request			(SavedConnection& client);
 			std::expected<void, Error> 		handle_request			(SocketFD connected_socket);
 			std::expected<void, Error> 		run_event_loop			();
 	
-			void							close_client			(SavedConnection& client);
+			void							close_client			(SavedConnection& client) noexcept;
+			void 							close_server			() noexcept;
+
+	
+	constexpr void log(const Error& error) const;
 
 public:
 	explicit constexpr RetransmitServer(Cache& retransmit_cache)

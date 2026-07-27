@@ -61,7 +61,7 @@ public:
 		close();
 	}
 
-	constexpr void set_socket(SocketFD socket) const noexcept { socket_fd_ = socket; }
+	constexpr void set_socket(SocketFD socket) noexcept { socket_fd_ = socket; }
 	constexpr Status status() const noexcept { return connection_status_; }
 	constexpr SocketFD socket() const noexcept { return socket_fd_; }
 

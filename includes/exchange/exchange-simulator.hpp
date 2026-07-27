@@ -11,7 +11,7 @@
 
 class exchange::ExchangeSimulator {
 private:
-    
+    static constexpr bool LOGGING = true;
 };
 
 #endif

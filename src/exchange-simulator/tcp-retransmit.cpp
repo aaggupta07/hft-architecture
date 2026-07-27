@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cassert>
+#include <print>
 
 namespace exchange {
 
@@ -35,6 +36,10 @@ auto RetransmitRequest::serialize(const RetransmitRequest &request) {
 	std::memcpy(buffer.data(), &network_order.first_packet, sizeof(first_packet));
 	std::memcpy(buffer.data() + sizeof(first_packet), &network_order.last_packet, sizeof(last_packet));
 	return buffer;
+}
+
+constexpr void RetransmitServer::log(const Error& error) const {
+	std::println("{}", error);
 }
 
 std::expected<void, Error> RetransmitServer::set_socket_nonblocking(int socket_fd) {
@@ -66,7 +71,7 @@ std::expected<void, Error> RetransmitServer::register_write_event(int kq, int so
 	return {};
 }
 
-void RetransmitServer::unregister(int kq, int socket_fd) {
+void RetransmitServer::unregister(int kq, int socket_fd) noexcept {
 	struct kevent event;
 	EV_SET(&event, socket_fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
 	kevent(kq, &event, 1, nullptr, 0, nullptr); // best effort
@@ -108,10 +113,11 @@ auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 	return new_socket;
 }
 
-void RetransmitServer::close_client(SavedConnection& client)  {
-	unregister(event_queue_, client.connection.socket());
+void RetransmitServer::close_client(SavedConnection& client) noexcept {
+	if(event_queue_ >= 0) unregister(event_queue_, client.connection.socket());
 	client.connection.close();
 	client.request = std::nullopt;
+	--current_connections;
 }
 
 auto RetransmitServer::initialize() -> std::expected<void, Error> {
@@ -122,19 +128,145 @@ auto RetransmitServer::initialize() -> std::expected<void, Error> {
 			return std::unexpected(result.error());
 		}
 		socket_fd_ = *result;
+		current_connections = 1;
 	}
 
 	// Create event queue [BSD/macOS only]
 	event_queue_ = kqueue();
 	if(event_queue_ == INVALID) [[unlikely]] {
-		return std::unexpected(Error::EventQueueError);
+		return std::unexpected(Error::EventQueue);
 	} 
 
 	return register_read_event(event_queue_, socket_fd_);
 }
 
+// TODO: transmit Error::Server to client
+void RetransmitServer::close_server() noexcept {
+	if(socket_fd_ >= 0) {
+		close(socket_fd_);
+		socket_fd_ = INVALID;
+	}
+	for(SavedConnection& client: connection_buffers) {
+		close_client(client);
+	}
+	if(event_queue_ >= 0) {
+		close(event_queue_);
+		event_queue_ = INVALID;
+	}
+}
+
+auto RetransmitServer::get_connected_socket() -> std::expected<SocketFD, Error> {
+	if(current_connections >= MAX_TOTAL_CONNECTIONS) {
+		return std::unexpected(Error::ServerBusy);
+	}
+
+	SocketFD connected_socket = accept(socket_fd_, nullptr, nullptr);
+	if(connected_socket == INVALID && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+		return std::unexpected(Error::WouldBlock);
+	}
+	else if(connected_socket == INVALID && (errno == EINTR || errno == ECONNABORTED)) {
+		return std::unexpected(Error::NewConnection);
+	}
+	else if(connected_socket == INVALID) {
+		return std::unexpected(Error::ServerFatal);
+	}
+
+
+	auto result = set_socket_nonblocking(connected_socket);
+	if(!result) {
+		// TODO: Message -> ClientConnection
+		close(connected_socket);
+		return std::unexpected(Error::SetSocketNonblocking);
+	}
+
+	result = register_read_event(event_queue_, connected_socket);
+	if(!result) {
+		// TODO: Message -> ClientConnection
+		close(connected_socket);
+		return std::unexpected(Error::RegisterEvent);
+	}
+
+	return connected_socket;
+}
+
+auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
+	while(true) {
+		auto result = get_connected_socket();
+		if(!result) {
+			switch(result.error()) {
+				case Error::RegisterEvent: [[fallthrough]];
+				case Error::SetSocketNonblocking:
+					if constexpr(LOGGING) log(result.error());
+					[[fallthrough]];
+				case Error::NewConnection:
+					continue;
+				case Error::WouldBlock: [[fallthrough]];
+				case Error::ServerBusy:
+					goto no_more_connections;
+				case Error::ServerFatal:
+					return std::unexpected(result.error());
+				default:
+					assert(false && "[TCP Retransmit] Handle New Connection: Unreachable");
+					std::unreachable();
+			}
+		}
+
+		SocketFD new_socket = *result;
+		while(static_cast<size_t>(new_socket) >= connection_buffers.size()) {
+			connection_buffers.emplace_back(SavedConnection());
+		}
+		connection_buffers[new_socket].connection.set_socket(new_socket);
+	}
+	no_more_connections:
+		return {};
+}
+
 auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
-	// TODO
+	std::array<struct kevent, MAX_TOTAL_CONNECTIONS * 2> events;
+
+	while(true) {
+		int num_of_events = kevent(event_queue_, nullptr, 0, events.data(), events.size(), nullptr);
+		if(num_of_events == INVALID && errno == EINTR) continue;
+		else if(num_of_events == INVALID) [[unlikely]]  {
+			close_server();
+			return std::unexpected(Error::EventQueue);
+		}
+
+		for(int i = 0; i < num_of_events; ++i) {
+			const struct kevent& event = events[i];
+
+			// Error with client event
+			if((event.flags & EV_ERROR) && static_cast<SocketFD>(event.ident) != socket_fd_) {
+				// TODO: message client
+				close_client(connection_buffers[event.ident]);
+				continue;
+			}
+			// Error with listener (fatal)
+			else if((event.flags & EV_ERROR)) [[unlikely]] {
+				close_server();
+				return std::unexpected(Error::EventQueue);
+			}
+			
+			// New connection(s) on listener
+			if(static_cast<SocketFD>(event.ident) == socket_fd_) {
+				auto result = handle_new_connections();
+				if(!result && result.error() == Error::ServerFatal) [[unlikely]] {
+					close_server();
+					return std::unexpected(Error::ServerFatal);
+				}
+			}
+
+			// New event on existing connection
+			else {
+				auto result = handle_request(static_cast<SocketFD>(event.ident));
+				if constexpr(LOGGING) {
+					if(!result) log(result.error());
+				}
+			}
+		}
+	}
+
+	close_server();
 	return {};
 }
 
@@ -205,7 +337,22 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 		case Connection<N>::Status::PartialReceive:
 			{ 
 				auto result = receive_request(client);
-				if(!result) return result;
+				if(!result) {
+					switch(result.error()) {
+						case Error::WouldBlock: // Drained partial message - rest is unavailable right now
+							return {};
+						case Error::ClientConnectionClosed:
+							close_client(client);
+							return std::unexpected(result.error());
+						case Error::ReceiveFromClient:
+							// TODO: Mesage client w/ error code (EncodedMessage -> SequenceID = 0)
+							close_client(client);
+							return std::unexpected(result.error());
+						default:
+							assert(false && "[TCP Retransmit] Handler (receive request): Unreachable");
+							std::unreachable();
+					}
+				}
 			}
 			[[fallthrough]];
 		case Connection<N>::Status::SavedMessage:
@@ -213,7 +360,33 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 		case Connection<N>::Status::PartialSend:
 			{
 				auto result = stream_packets(client);
-				if(!result) return result;
+				if(!result) {
+					switch(result.error()) {
+						case Error::WouldBlock:
+							{
+								auto event_result = register_write_event(event_queue_, connected_socket);
+								if(!event_result) {
+									// TODO: Message client w/ Error -> bake this into close_client()
+									close_client(client);
+									return std::unexpected(event_result.error());
+								}
+								return {};
+							}
+						case Error::ClientConnectionClosed:
+							close_client(client);
+							return std::unexpected(result.error());
+						case Error::PacketTooOld: [[fallthrough]];
+						case Error::InvalidPacket: [[fallthrough]];
+						case Error::PacketUnavailable: [[fallthrough]];
+						case Error::SendToClient:
+							// TODO: Message Client with Error (tie enum class errors to specific values)
+							close_client(client);
+							return std::unexpected(result.error());
+						default:
+							assert(false && "[TCP Retransmit] Handler (send request): Unreachable");
+							std::unreachable();
+					}
+				}
 			}
 			break;
 	}
