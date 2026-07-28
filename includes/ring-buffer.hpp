@@ -3,19 +3,18 @@
 
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <new>
 #include <optional>
-#include <thread>
 #include <type_traits>
 #include <utility>
 
 /*
  * An efficient, lazy-initialized single-producer single-consumer 
  * C++23 thread-safe ring buffer for placeable in MAP_SHARED.
- * Wait semantics use polling instead of sem_t for performance.
+ * Wait semantics spin instead of using sem_t or timeouts. On Apple Silicon,
+ * waiters use ARM's event mechanism to reduce power while awaiting progress.
  *
  * Required:
  * - CAPACITY is the number of elements of type T storable in the ring buffer.
@@ -35,13 +34,8 @@ private:
     static_assert(std::atomic<size_t>::is_always_lock_free,
                   "std::atomic<size_t> must be lock-free");
 
-    using Clock = std::chrono::steady_clock;
-    using TimeOut = std::chrono::time_point<Clock>;
-    using milliseconds = std::chrono::milliseconds;
-
     static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
     static constexpr size_t MASK = CAPACITY - 1;
-    static constexpr milliseconds DEFAULT_TIMEOUT{1};
 
     struct alignas(T) Slot {
         std::byte storage[sizeof(T)];
@@ -65,27 +59,41 @@ private:
         return reinterpret_cast<T*>(buffer_[sequence & MASK].storage);
     }
 
+    /* Apple Silicon optimization only: 
+	 * Uses ARM's event mechanism to reduce power while spinning. 
+	 * SEVL makes the first WFE return immediately. Publishers issue SEV
+	 * after releasing their cursor to wake a thread that is already waiting.
+	*/ 
+    static inline void wait_for_progress() noexcept {
+		#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+				asm volatile("sevl\n\twfe" ::: "memory");
+		#endif
+    }
+
+    static inline void notify_waiter() noexcept {
+		#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+				asm volatile("sev" ::: "memory");
+		#endif
+    }
+
     template <typename U>
     bool try_push_internal(U&& item) {
-        const size_t current_tail = tail_.load(std::memory_order_acquire);
-        if (full(head_.load(std::memory_order_relaxed), current_tail)) {
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
+        if (full(head_.load(std::memory_order_acquire), current_tail)) {
             return false;
         }
 
         std::construct_at(storage_slot(current_tail), std::forward<U>(item));
         tail_.store(current_tail + 1, std::memory_order_release);
+        notify_waiter();
         return true;
     }
 
     template <typename U>
-    bool wait_push_internal(U&& item, milliseconds timeout, TimeOut until) {
+    void wait_push_internal(U&& item) {
         while (!try_push_internal(std::forward<U>(item))) {
-            if (Clock::now() >= until) {
-                return false;
-            }
-            std::this_thread::sleep_for(timeout);
+            wait_for_progress();
         }
-        return true;
     }
 
 public:
@@ -100,39 +108,34 @@ public:
     bool try_push(T&& item) { return try_push_internal(std::move(item)); }
     bool try_push(const T& item) { return try_push_internal(item); }
 
-    // May sleep past `until` by at most `timeout`. Waiting is polling-based for performance
-    bool wait_push(T&& item, milliseconds timeout = DEFAULT_TIMEOUT,
-                   TimeOut until = TimeOut::max()) {
-        return wait_push_internal(std::move(item), timeout, until);
+    // Spins until space is available.
+    void wait_push(T&& item) {
+        wait_push_internal(std::move(item));
     }
 
-    bool wait_push(const T& item, milliseconds timeout = DEFAULT_TIMEOUT,
-                   TimeOut until = TimeOut::max()) {
-        return wait_push_internal(item, timeout, until);
+    void wait_push(const T& item) {
+        wait_push_internal(item);
     }
 
     std::optional<T> try_pop() {
-        const size_t current_head = head_.load(std::memory_order_acquire);
-        if (empty(current_head, tail_.load(std::memory_order_relaxed))) {
+        const size_t current_head = head_.load(std::memory_order_relaxed);
+        if (empty(current_head, tail_.load(std::memory_order_acquire))) {
             return std::nullopt;
         }
 
         T value = *std::launder(storage_slot(current_head));
         head_.store(current_head + 1, std::memory_order_release);
+        notify_waiter();
         return value;
     }
 
-    // May sleep past `until` by at most `timeout`
-    std::optional<T> wait_pop(milliseconds timeout = DEFAULT_TIMEOUT,
-                                             TimeOut until = TimeOut::max()) {
+    // Spins until an item is available.
+    T wait_pop() {
         while (true) {
             if (auto value = try_pop()) {
-                return value;
+                return std::move(*value);
             }
-            if (Clock::now() >= until) {
-                return std::nullopt;
-            }
-            std::this_thread::sleep_for(timeout);
+            wait_for_progress();
         }
     }
 

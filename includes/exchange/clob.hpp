@@ -14,6 +14,7 @@ private:
 	static constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 10;
 	using MarketEventBuffer = SharedRingBuffer<MarketEvent, MARKET_EVENT_BUFFER_CAPACITY>;
 	
+	Order::ID next_order_id_ = 1;
 	BookState state_;
 	MarketEventBuffer& buffer_;
 

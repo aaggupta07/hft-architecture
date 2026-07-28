@@ -50,7 +50,6 @@ void CentralLimitOrderBook::add_order(Order& new_order) {
 
 void CentralLimitOrderBook::buy_order(const OrderRequest& request) {
 	Order order {
-		.order_id = request.order_id,
 		.price = request.price,
 		.quantity = request.quantity,
 		.side = Order::Side::Buy,
@@ -60,13 +59,13 @@ void CentralLimitOrderBook::buy_order(const OrderRequest& request) {
 	while(execute_trade(order));
 
 	if(order.quantity != 0) {
+		order.order_id = next_order_id_++;
 		add_order(order);
 	}
 }
 
 void CentralLimitOrderBook::sell_order(const OrderRequest& request) {
 	Order order {
-		.order_id = request.order_id,
 		.price = request.price,
 		.quantity = request.quantity,
 		.side = Order::Side::Sell,
@@ -76,6 +75,7 @@ void CentralLimitOrderBook::sell_order(const OrderRequest& request) {
 	while(execute_trade(order));
 
 	if(order.quantity != 0) {
+		order.order_id = next_order_id_++;
 		add_order(order);
 	}
 }
@@ -84,9 +84,8 @@ std::expected<void, Error> CentralLimitOrderBook::cancel_order(const OrderReques
 	if(state_.order_exists(request.order_id)) {
 		state_.cancel(request.order_id);
 
-		Order new_order { .order_id = request.order_id };
 		MarketEvent canceled_order {
-			.order = new_order,
+			.order = Order { .order_id = request.order_id },
 			.type = MarketEvent::Type::Cancel,
 		};
 
