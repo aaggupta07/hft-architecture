@@ -34,7 +34,7 @@ namespace exchange::config {
 	inline constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 10;
 
 	// Encoded Message Configuration
-	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 6;
+	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 5;
 
 	// Sequencer Configuration (None)
 

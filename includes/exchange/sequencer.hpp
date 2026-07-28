@@ -8,16 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#include <concepts>
-#include <span>
-
-
 namespace exchange {
-template<typename Encoder>
-concept BinaryEncoder = requires(Encoder encoder, const MarketEvent& event) {
-    {encoder.encode(event)} -> std::convertible_to<std::span<uint8_t>>;
-};
-
 template<BinaryEncoder Encoder>
 class Sequencer {
 private:

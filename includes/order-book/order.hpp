@@ -11,7 +11,7 @@ struct Order {
 	using Quantity = uint32_t;
 	static constexpr ID INVALID_ORDER_ID = 0;
 
-	enum class Side: bool {
+	enum class Side: uint8_t {
         Buy,
         Sell,
     };

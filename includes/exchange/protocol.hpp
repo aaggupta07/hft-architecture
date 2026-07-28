@@ -1,13 +1,14 @@
 #ifndef PROTOCOL_HPP
 #define PROTOCOL_HPP
 
+#include "order.hpp"
+
 #include <cstdint>
 #include <cstddef>
 #include <span>
-#include "order.hpp"
+#include <concepts>
 
 namespace exchange {
-
 using SequenceID = uint64_t;
 using Length = uint16_t;
 using Byte = uint8_t;
@@ -34,11 +35,21 @@ struct OrderRequest {
 	Type type;
 };
 
-class CentralLimitOrderBook;
 class MarketRequestGenerator;
+class CentralLimitOrderBook;
 
+class BinaryOrderExchangeFormat;
 class EncodedMessage;
+
+template<typename Encoder>
+concept BinaryEncoder = requires(Encoder encoder, const MarketEvent& event) {
+    {encoder.encode(event)} -> std::convertible_to<std::span<uint8_t>>;
+};
+template<BinaryEncoder Encoder>
+class Sequencer;
+
 class Broadcaster;
+template<size_t N> class Connection;
 class RetransmitServer;
 
 class ExchangeSimulator;

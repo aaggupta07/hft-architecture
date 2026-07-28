@@ -42,7 +42,7 @@ public:
 		large_quantity_distribution(config::MIN_LARGE_QUANTITY, config::MAX_LARGE_QUANTITY),
 		clob_(order_book) {}
 	
-	void launch();
+	void start();
 };
 }
 

@@ -144,7 +144,7 @@ void MarketRequestGenerator::generate_and_post_random_order_request() {
 	std::ignore = clob_.submit(*request);
 }
 
-void MarketRequestGenerator::launch() {
+void MarketRequestGenerator::start() {
 	populate_active_orders();
 	while(true) {
 		generate_and_post_random_order_request();
