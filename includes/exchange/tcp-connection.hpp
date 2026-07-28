@@ -26,7 +26,7 @@ public:
 
 private:
 	using SocketFD = int;
-	std::array<Byte, N> buffer_;
+	std::array<std::byte, N> buffer_;
 	SocketFD socket_fd_ = -1;
 	size_t head_ = 0;
 	size_t tail_ = 0;
@@ -79,7 +79,7 @@ public:
 		}
 	}
 
-	constexpr void save(const std::span<const Byte> bytes) {
+	constexpr void save(const std::span<const std::byte> bytes) {
 		assert(connection_status_ == Status::Clear || connection_status_ == Status::SavedMessage);
 		assert(bytes.size() < buffer_.size() - head_);
 		std::ranges::copy(bytes, buffer_.data() + head_);
@@ -112,7 +112,7 @@ public:
 		return {};
 	}
 
-	std::expected<std::array<Byte, N>, Error> receive(size_t bytes) {
+	std::expected<std::array<std::byte, N>, Error> receive(size_t bytes) {
 		assert(socket_fd_ >= 0);
 		assert(head_ + bytes < buffer_.size());
 		assert(connection_status_ == Status::Clear || connection_status_ == Status::PartialReceive);

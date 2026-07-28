@@ -21,7 +21,7 @@ private:
 public:
     Broadcaster() = default;
     std::expected<void, Error> start();
-    std::expected<void, Error> send(const std::span<Byte> message);    
+    std::expected<void, Error> send(const std::span<const std::byte> message);    
 };
 }
 

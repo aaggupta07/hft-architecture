@@ -40,8 +40,8 @@ auto Broadcaster::start() -> std::expected<void, Error> {
 	return {};
 }
 
-auto Broadcaster::send(const std::span<Byte> message) -> std::expected<void, Error> {
-	assert(message.size() < MAX_MESSAGE_BYTES);
+auto Broadcaster::send(const std::span<const std::byte> message) -> std::expected<void, Error> {
+	assert(message.size() < config::MAX_MESSAGE_BYTES);
 	int bytes_sent = ::send(socket_fd_, message.data(), message.size(), 0);
 	if(bytes_sent == -1) return std::unexpected(Error::Send); 
 	return {};

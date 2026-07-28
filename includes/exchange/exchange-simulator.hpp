@@ -8,6 +8,7 @@
 #include "clob.hpp"
 #include "ring-buffer.hpp"
 
+#include "boe-format.hpp"
 #include "sequencer.hpp"
 
 #include "circular-cache.hpp"
@@ -17,9 +18,22 @@
 
 class exchange::ExchangeSimulator {
 private:
+	void initialize();
+	void launch_retransmit_server();
+	void launch_order_generator();
 
+	void run();
+
+	using MarketEventBuffer = SharedRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
+	
+	MarketEventBuffer market_event_buffer_;
+	CentralLimitOrderBook clob_;
+	MarketRequestGenerator order_generator_;
+
+	Sequencer<BinaryOrderExchangeFormat> sequencer_;
+	
 public:
-	ExchangeSimulator() = default;
+	ExchangeSimulator();
 	~ExchangeSimulator() = default;
 
 	ExchangeSimulator(const ExchangeSimulator&) = delete;
@@ -27,7 +41,7 @@ public:
 	ExchangeSimulator(ExchangeSimulator&&) = delete;
 	ExchangeSimulator& operator=(ExchangeSimulator&&) = delete;
 
-	void launch();
+	void start();
 };
 
 #endif

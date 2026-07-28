@@ -11,7 +11,6 @@
 namespace exchange {
 using SequenceID = uint64_t;
 using Length = uint16_t;
-using Byte = uint8_t;
 
 // A sequence number of 0 is reserved for error messages
 // In this case, the payload_length field contains the error code, and the buffer is empty
@@ -19,7 +18,7 @@ struct MessageHeader {
     SequenceID sequence_number;
     Length payload_length;
 
-    void serialize(std::span<Byte> buffer) const;
+    void serialize(std::span<std::byte> buffer) const;
 };
 
 struct OrderRequest {
@@ -41,10 +40,20 @@ class CentralLimitOrderBook;
 class BinaryOrderExchangeFormat;
 class EncodedMessage;
 
+template<typename T>
+concept ConvertibleToSpan = requires {
+	typename std::ranges::range_value_t<T>;
+} && (
+	std::convertible_to<T, std::span<std::ranges::range_value_t<T>>> ||
+	std::convertible_to<T, std::span<const std::ranges::range_value_t<T>>>
+);
+
+
 template<typename Encoder>
 concept BinaryEncoder = requires(Encoder encoder, const MarketEvent& event) {
-    {encoder.encode(event)} -> std::convertible_to<std::span<uint8_t>>;
+    {Encoder::encode(event)} -> ConvertibleToSpan;
 };
+
 template<BinaryEncoder Encoder>
 class Sequencer;
 

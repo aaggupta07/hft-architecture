@@ -18,7 +18,7 @@ struct RetransmitRequest {
 	SequenceID first_packet;
 	SequenceID last_packet;
 
-	static RetransmitRequest 	parse(const std::span<Byte> wire);
+	static RetransmitRequest 	parse(const std::span<std::byte> wire);
 	static auto 				serialize(const RetransmitRequest& request);
 };
 

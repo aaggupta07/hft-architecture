@@ -16,7 +16,7 @@
 
 namespace exchange {
 
-RetransmitRequest RetransmitRequest::parse(const std::span<Byte> wire) {
+RetransmitRequest RetransmitRequest::parse(const std::span<std::byte> wire) {
 	assert(wire.size() == sizeof(RetransmitRequest));
 
 	RetransmitRequest request;
@@ -29,7 +29,7 @@ RetransmitRequest RetransmitRequest::parse(const std::span<Byte> wire) {
 }
 
 auto RetransmitRequest::serialize(const RetransmitRequest &request) {
-	std::array<Byte, sizeof(RetransmitRequest)> buffer;
+	std::array<std::byte, sizeof(RetransmitRequest)> buffer;
 	RetransmitRequest network_order {
 		.first_packet = htonll(request.first_packet),
 		.last_packet = htonll(request.last_packet),

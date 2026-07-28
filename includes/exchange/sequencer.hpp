@@ -31,7 +31,9 @@ EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
         .payload_length = payload.size()
     };
 
-    return EncodedMessage(header, payload);
+    auto message =  EncodedMessage(header, payload);
+	message.serialize();
+	return message;
 }
 }
 

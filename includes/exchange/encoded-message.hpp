@@ -14,10 +14,10 @@ public:
 	static constexpr size_t MAX_WIRE_SIZE = config::MAX_MESSAGE_BYTES + sizeof(MessageHeader);
 private:
 	MessageHeader header_;
-	std::array<Byte, MAX_WIRE_SIZE> buffer_;
+	std::array<std::byte, MAX_WIRE_SIZE> buffer_;
 	
 public:
-    EncodedMessage(MessageHeader header, std::span<Byte> payload)
+    EncodedMessage(MessageHeader header, std::span<std::byte> payload)
         : header_(header)
     { 
     	assert(payload.size() <= config::MAX_MESSAGE_BYTES);
@@ -29,15 +29,15 @@ public:
         return header_;
     }
 
-    const std::span<const Byte> payload() const noexcept {
+    const std::span<const std::byte> payload() const noexcept {
         return std::span{buffer_}.subspan(sizeof(header_), header_.payload_length);
     }
 
-	const std::span<const Byte> message() const noexcept {
+	const std::span<const std::byte> message() const noexcept {
 		return std::span{buffer_}.subspan(0, sizeof(header_) + header_.payload_length);
 	}
 
-    std::array<Byte, MAX_WIRE_SIZE> serialize();
+    std::array<std::byte, MAX_WIRE_SIZE> serialize();
 };
 
 #endif
