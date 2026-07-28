@@ -3,6 +3,8 @@
 
 #include "order-pool.hpp"
 #include "closed-hash-map.hpp"
+#include "config.hpp"
+
 #include <set>
 #include <limits>
 
@@ -30,9 +32,6 @@ public:
 
 
 private:
-    static constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
-    static constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 14;
-
     using TotalQuantity = uint64_t;
     struct PriceLevel {
         RestingOrder::Index head;
@@ -40,9 +39,9 @@ private:
         TotalQuantity total_quantity;
     };
 
-    OrderPool<MAX_CONCURRENT_ORDERS> order_pool;
-    ClosedHashMap<Order::Price, PriceLevel, MAX_PRICE_LEVELS> price_levels;
-    ClosedHashMap<Order::ID, RestingOrder::Index, MAX_CONCURRENT_ORDERS> order_map;
+    OrderPool<config::MAX_CONCURRENT_ORDERS> order_pool;
+    ClosedHashMap<Order::Price, PriceLevel, config::MAX_PRICE_LEVELS> price_levels;
+    ClosedHashMap<Order::ID, RestingOrder::Index, config::MAX_CONCURRENT_ORDERS> order_map;
     
     std::set<Order::Price, std::greater<>> bids;
     std::set<Order::Price> offers;

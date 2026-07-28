@@ -6,6 +6,7 @@
 #include "encoded-message.hpp"
 #include "exchange-errors.hpp"
 #include "tcp-connection.hpp"
+#include "config.hpp"
 
 #include <expected>
 #include <span>
@@ -23,18 +24,12 @@ struct RetransmitRequest {
 
 class RetransmitServer {
 private:
-	static constexpr size_t RETRANSMIT_CACHE_SIZE 		= 1 << 10;
-	static constexpr const char* RETRANSMIT_PORT 		= "40000";
-	static constexpr int MAX_PENDING_CONNECTIONS 		= 10;
-	static constexpr bool LOGGING						= true;
+	static constexpr int INVALID 	= -1;
+	static constexpr size_t N		= EncodedMessage::MAX_WIRE_SIZE;
 
-	static constexpr int INVALID 						= -1;
-	static constexpr size_t N							= EncodedMessage::MAX_WIRE_SIZE;
+	
 
-	static constexpr size_t DEFAULT_CONNECTION_BUFFERS 	= 5;
-	static constexpr size_t MAX_TOTAL_CONNECTIONS 		= 25;
-
-	using Cache = CircularCache<EncodedMessage, RETRANSMIT_CACHE_SIZE>;
+	using Cache = CircularCache<EncodedMessage, config::RETRANSMIT_CACHE_SIZE>;
 	using SocketFD = int;
 	using EventQueue = int;
 	
@@ -73,7 +68,7 @@ private:
 
 public:
 	explicit constexpr RetransmitServer(Cache& retransmit_cache)
-		: retransmit_cache_(retransmit_cache), connection_buffers(DEFAULT_CONNECTION_BUFFERS) {}
+		: retransmit_cache_(retransmit_cache), connection_buffers(config::DEFAULT_CONNECTION_BUFFERS) {}
 
 	std::expected<void, Error> initialize();
 	std::expected<void, Error> start();

@@ -5,10 +5,10 @@ namespace exchange{
 Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, bool aggressive) {
 	assert(type == OrderRequest::Type::Buy || type == OrderRequest::Type::Sell);
 	BookState::OrderSnapshot snapshot = clob_.snapshot();
-	const Order::Price best_bid = snapshot.best_bid.price == Order::INVALID_ORDER_ID ? DEFAULT_BUY_PRICE : snapshot.best_bid.price;
-	const Order::Price best_ask = snapshot.best_offer.price == Order::INVALID_ORDER_ID ? DEFAULT_SELL_PRICE : snapshot.best_offer.price;
+	const Order::Price best_bid = snapshot.best_bid.price == Order::INVALID_ORDER_ID ? config::DEFAULT_BUY_PRICE : snapshot.best_bid.price;
+	const Order::Price best_ask = snapshot.best_offer.price == Order::INVALID_ORDER_ID ? config::DEFAULT_SELL_PRICE : snapshot.best_offer.price;
 
-	const Order::Price price_variance = aggressive ? LARGE_PRICE_VARIANCE : PRICE_VARIANCE;
+	const Order::Price price_variance = aggressive ? config::LARGE_PRICE_VARIANCE : config::PRICE_VARIANCE;
 
 	Order::Price min_price;
 	Order::Price max_price;
@@ -29,8 +29,8 @@ Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, boo
 		max_price = best_bid;
 	}
 
-	min_price = std::max(min_price, MIN_PRICE);
-	max_price = std::min(max_price, MAX_PRICE);
+	min_price = std::max(min_price, config::MIN_PRICE);
+	max_price = std::min(max_price, config::MAX_PRICE);
 	std::uniform_int_distribution<Order::Price> price_distribution(min_price, max_price);
 
 	return price_distribution(generator);
@@ -80,7 +80,7 @@ std::optional<OrderRequest> MarketRequestGenerator::generate_new_order_request(O
 	
 	double random_value = order_type_distribution(generator);
 	OrderRequest new_request;
-	if(random_value < AGGRESSIVE_ORDER_PROBABILITY) {
+	if(random_value < config::AGGRESSIVE_ORDER_PROBABILITY) {
 		new_request =  generate_aggressive_order_request(type);
 	}
 	else [[likely]] {
@@ -94,7 +94,7 @@ std::optional<OrderRequest> MarketRequestGenerator::generate_new_order_request(O
 }
 
 void MarketRequestGenerator::populate_active_orders() {
-	while(active_order_ids.size() < POPULATE_WHEN_EMPTY) {
+	while(active_order_ids.size() < config::POPULATE_WHEN_EMPTY) {
 		double random_value = order_type_distribution(generator);
 		OrderRequest::Type type = random_value < (NORMALIZED_BUY_SELL_PROBABILITY) ? OrderRequest::Type::Buy : OrderRequest::Type::Sell;
 		auto result = generate_new_order_request(type);
@@ -105,7 +105,7 @@ void MarketRequestGenerator::populate_active_orders() {
 }
 
 void MarketRequestGenerator::purge_active_orders() {
-	while(active_order_ids.size() > PURGE_UNTIL_WHEN_FULL) {
+	while(active_order_ids.size() > config::PURGE_UNTIL_WHEN_FULL) {
 		auto result = generate_cancel_request();
 		if(!result) break; // No more active orders to cancel
 
@@ -119,14 +119,14 @@ void MarketRequestGenerator::generate_and_post_random_order_request() {
 	double random_value = order_type_distribution(generator);
 
 	std::optional<OrderRequest> request;
-	if(random_value < CANCEL_PROBABILITY) {
+	if(random_value < config::CANCEL_PROBABILITY) {
 		request = generate_cancel_request();
 		if(!request) [[unlikely]]{
 			populate_active_orders();
 			return;
 		}
 	}
-	else if(random_value < CANCEL_PROBABILITY + BUY_PROBABILITY) {
+	else if(random_value < config::CANCEL_PROBABILITY + config::BUY_PROBABILITY) {
 		request = generate_new_order_request(OrderRequest::Type::Buy);
 		if(!request) [[unlikely]] {
 			purge_active_orders();

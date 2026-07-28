@@ -32,6 +32,7 @@ struct RestingOrder {
     Index next = NULL_INDEX;
 };
 
+// MarketEvent: 32 bytes => Typically, two events packed onto one cache line
 struct MarketEvent {
 	enum class Type: uint8_t {
 		Add,

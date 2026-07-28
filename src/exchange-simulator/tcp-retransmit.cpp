@@ -85,7 +85,7 @@ auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	int status = getaddrinfo(nullptr, RETRANSMIT_PORT, &hints, &server_info);
+	int status = getaddrinfo(nullptr, config::RETRANSMIT_PORT, &hints, &server_info);
 	if(status != 0) [[unlikely]] {
 		return std::unexpected(Error::AddressInfo);
 	}
@@ -168,7 +168,7 @@ void RetransmitServer::close_server() noexcept {
 }
 
 auto RetransmitServer::get_connected_socket() -> std::expected<SocketFD, Error> {
-	if(current_connections >= MAX_TOTAL_CONNECTIONS) {
+	if(current_connections >= config::MAX_TOTAL_CONNECTIONS) {
 		return std::unexpected(Error::ServerBusy);
 	}
 
@@ -206,7 +206,7 @@ auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
 			switch(result.error()) {
 				case Error::RegisterEvent: [[fallthrough]];
 				case Error::SetSocketNonblocking:
-					if constexpr(LOGGING) log(result.error());
+					if constexpr(config::LOGGING) log(result.error());
 					[[fallthrough]];
 				case Error::NewConnection:
 					continue;
@@ -232,7 +232,7 @@ auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
 }
 
 auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
-	std::array<struct kevent, MAX_TOTAL_CONNECTIONS * 2> events;
+	std::array<struct kevent, config::MAX_TOTAL_CONNECTIONS * 2> events;
 
 	while(true) {
 		int num_of_events = kevent(event_queue_, nullptr, 0, events.data(), events.size(), nullptr);
@@ -268,7 +268,7 @@ auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
 			// New event on existing connection
 			else {
 				auto result = handle_request(static_cast<SocketFD>(event.ident));
-				if constexpr(LOGGING) {
+				if constexpr(config::LOGGING) {
 					if(!result) log(result.error());
 				}
 			}
@@ -284,7 +284,7 @@ auto RetransmitServer::start() -> std::expected<void, Error> {
 		auto result = initialize();
 		if(!result) return std::unexpected(result.error());
 	}
-	int status = listen(socket_fd_, MAX_PENDING_CONNECTIONS);
+	int status = listen(socket_fd_, config::MAX_PENDING_CONNECTIONS);
 	if(status == INVALID) [[unlikely]] {
 		return std::unexpected(Error::StartRetransmitServer);
 	}

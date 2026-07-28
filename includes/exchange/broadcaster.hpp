@@ -19,10 +19,6 @@ private:
     Port port = 0;
 
 public:
-	static constexpr char       MCAST_GROUP[]	= "224.0.1.5";
-    static constexpr Port		MCAST_PORT		= 50000;
-
-
     Broadcaster() = default;
     std::expected<void, Error> start();
     std::expected<void, Error> send(const std::span<Byte> message);    

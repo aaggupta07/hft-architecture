@@ -1,14 +1,16 @@
 #ifndef LOCK_FREE_BUFFER_HPP
 #define LOCK_FREE_BUFFER_HPP
 
+#include "config.hpp"
+
 #include <array>
 #include <atomic>
 #include <cstddef>
 #include <memory>
-#include <new>
 #include <optional>
 #include <type_traits>
 #include <utility>
+#include <new>
 
 /*
  * An efficient, lazy-initialized single-producer single-consumer 
@@ -34,7 +36,6 @@ private:
     static_assert(std::atomic<size_t>::is_always_lock_free,
                   "std::atomic<size_t> must be lock-free");
 
-    static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
     static constexpr size_t MASK = CAPACITY - 1;
 
     struct alignas(T) Slot {
@@ -43,9 +44,9 @@ private:
 
     // Keep the ownership indices on distinct cache lines.  All remaining
     // state is position independent, so mappings may have different bases.
-    alignas(CACHE_LINE_SIZE) std::atomic<size_t> head_{0};
-    alignas(CACHE_LINE_SIZE) std::atomic<size_t> tail_{0};
-    alignas(CACHE_LINE_SIZE) std::array<Slot, CAPACITY> buffer_{};
+    alignas(config::CACHE_LINE_SIZE) std::atomic<size_t> head_{0};
+    alignas(config::CACHE_LINE_SIZE) std::atomic<size_t> tail_{0};
+    alignas(config::CACHE_LINE_SIZE) std::array<Slot, CAPACITY> buffer_{};
 
     inline static constexpr bool empty(size_t head, size_t tail) noexcept {
         return head == tail;

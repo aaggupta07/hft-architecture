@@ -1,17 +1,20 @@
 #ifndef SEQUENCER_HPP
 #define SEQUENCER_HPP
 
+#include "protocol.hpp"
+#include "encoded-message.hpp"
+#include "order.hpp"
+
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
 #include <concepts>
 #include <span>
-#include "protocol.hpp"
-#include "encoded-message.hpp"
+
 
 namespace exchange {
 template<typename Encoder>
-concept BinaryEncoder = requires(Encoder encoder, const events::ExchangeEvent& event) {
+concept BinaryEncoder = requires(Encoder encoder, const MarketEvent& event) {
     {encoder.encode(event)} -> std::convertible_to<std::span<uint8_t>>;
 };
 
@@ -25,11 +28,11 @@ public:
     Sequencer(Encoder encoder)
         : encoder_(encoder) {}
     
-    EncodedMessage generate_message(const events::ExchangeEvent& event);
+    EncodedMessage generate_message(const MarketEvent& event);
 };
 
 template<BinaryEncoder Encoder>
-EncodedMessage Sequencer<Encoder>::generate_message(const events::ExchangeEvent& event) {
+EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
     auto payload = encoder_.encode(event);
     
     MessageHeader header {

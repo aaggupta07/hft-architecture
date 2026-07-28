@@ -2,15 +2,16 @@
 #define ORDER_POOL_HPP
 
 #include "order.hpp"
+#include "config.hpp"
+
 #include <numeric>
-#include <new>
 
 template<std::size_t CAPACITY>
 class OrderPool {
 private:
-    static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
+    
 
-    alignas (CACHE_LINE_SIZE) RestingOrder orders[CAPACITY];
+    alignas (config::CACHE_LINE_SIZE) RestingOrder orders[CAPACITY];
     RestingOrder::Index free_stack[CAPACITY];
     RestingOrder::Index top_index = CAPACITY;
 

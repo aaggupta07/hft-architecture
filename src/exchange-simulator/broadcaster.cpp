@@ -1,4 +1,6 @@
 #include "broadcaster.hpp"
+#include "config.hpp"
+
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -24,8 +26,8 @@ auto Broadcaster::start() -> std::expected<void, Error> {
 
     sockaddr_in destination{};
     destination.sin_family	= AF_INET;
-	destination.sin_port	= htons(MCAST_PORT);
-	status = inet_pton(AF_INET, MCAST_GROUP, &destination.sin_addr);
+	destination.sin_port	= htons(config::MCAST_PORT);
+	status = inet_pton(AF_INET, config::MCAST_GROUP, &destination.sin_addr);
 	if(status == -1) {
 		return std::unexpected(Error::StartBroadcast);
 	}

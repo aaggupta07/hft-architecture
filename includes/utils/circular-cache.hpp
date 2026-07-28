@@ -1,12 +1,12 @@
 #ifndef LOCK_FREE_CACHE
 #define LOCK_FREE_CACHE
 
+#include "config.hpp"
+
 #include <array>
 #include <atomic>
-#include <new>
 #include <expected>
 #include <limits>
-
 
 /*
 An SPSC ring buffer that allows the consumer to freely access any index
@@ -23,13 +23,12 @@ private:
 	static_assert(std::atomic<Index>::is_always_lock_free,
 					"std::atomic<size_t> must be lock free");
 	
-	static constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
 	static constexpr size_t MASK = CAPACITY - 1;
 	static constexpr Index IS_LOCKED = std::numeric_limits<Index>::max();
 
 	size_t write_index_ = 0;
-	alignas(CACHE_LINE_SIZE) std::array<std::atomic<Index>, CAPACITY> sequence_;
-	alignas(CACHE_LINE_SIZE) std::array<std::atomic<T>, CAPACITY> buffer_;
+	alignas(config::CACHE_LINE_SIZE) std::array<std::atomic<Index>, CAPACITY> sequence_;
+	alignas(config::CACHE_LINE_SIZE) std::array<std::atomic<T>, CAPACITY> buffer_;
 	
 	
 	void put_item_internal(T&& item);

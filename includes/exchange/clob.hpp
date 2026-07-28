@@ -6,13 +6,14 @@
 #include "book-state.hpp"
 #include "order.hpp"
 #include "ring-buffer.hpp"
+#include "config.hpp"
+
 #include <expected>
 
 namespace exchange {
 class CentralLimitOrderBook {
 private:
-	static constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 10;
-	using MarketEventBuffer = SharedRingBuffer<MarketEvent, MARKET_EVENT_BUFFER_CAPACITY>;
+	using MarketEventBuffer = SharedRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
 	
 	Order::ID next_order_id_ = 1;
 	BookState state_;
