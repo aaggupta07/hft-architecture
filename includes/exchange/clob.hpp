@@ -29,6 +29,7 @@ public:
 	CentralLimitOrderBook(MarketEventBuffer& buffer): buffer_(buffer) {}
 	std::expected<void, Error> submit(const OrderRequest& request);
 	BookState::OrderSnapshot snapshot() const noexcept { return state_.snapshot(); }
+	bool order_exists(Order::ID order_id) const noexcept { return state_.order_exists(order_id); }
 };
 
 }

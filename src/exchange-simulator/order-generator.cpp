@@ -36,16 +36,22 @@ Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, boo
 	return price_distribution(generator);
 }
 
-OrderRequest MarketRequestGenerator::generate_cancel_request() const {
-	std::uniform_int_distribution<size_t> active_order_distribution(0, active_order_count - 1);
-	Order::ID new_order_id = active_order_ids[active_order_distribution(generator)];
-	
+std::optional<OrderRequest> MarketRequestGenerator::generate_cancel_request() {
 	OrderRequest request {
-		.order_id = new_order_id,
 		.type = OrderRequest::Type::Cancel,
 	};
+	
 
-	return request;
+	while(true) {
+		auto result = active_order_ids.remove_random(generator);
+		if(!result) return std::nullopt;
+
+		// Lazily removes orders that may have been traded against
+		if(clob_.order_exists(*result)) {
+			request.order_id = *result;
+			return request;
+		}
+	};
 }
 
 
@@ -69,28 +75,79 @@ OrderRequest MarketRequestGenerator::generate_passive_order_request(OrderRequest
 	return request;
 }
 
-OrderRequest MarketRequestGenerator::generate_new_order_request(OrderRequest::Type type) {
+std::optional<OrderRequest> MarketRequestGenerator::generate_new_order_request(OrderRequest::Type type) {
 	assert(type == OrderRequest::Type::Buy || type == OrderRequest::Type::Sell);
 	
 	double random_value = order_type_distribution(generator);
+	OrderRequest new_request;
 	if(random_value < AGGRESSIVE_ORDER_PROBABILITY) {
-		return generate_aggressive_order_request(type);
+		new_request =  generate_aggressive_order_request(type);
 	}
-	else {
-		return generate_passive_order_request(type);
+	else [[likely]] {
+		new_request = generate_passive_order_request(type);
+	}
+	
+	bool added = active_order_ids.add(new_request.order_id);
+	if(!added) return std::nullopt;
+
+	return new_request;
+}
+
+void MarketRequestGenerator::populate_active_orders() {
+	while(active_order_ids.size() < POPULATE_WHEN_EMPTY) {
+		double random_value = order_type_distribution(generator);
+		OrderRequest::Type type = random_value < (NORMALIZED_BUY_SELL_PROBABILITY) ? OrderRequest::Type::Buy : OrderRequest::Type::Sell;
+		auto result = generate_new_order_request(type);
+		if(!result) [[unlikely]] break; // Active order list is full
+
+		std::ignore = clob_.submit(*result);
 	}
 }
 
-OrderRequest MarketRequestGenerator::generate_random_order_request() {
+void MarketRequestGenerator::purge_active_orders() {
+	while(active_order_ids.size() > PURGE_UNTIL_WHEN_FULL) {
+		auto result = generate_cancel_request();
+		if(!result) break; // No more active orders to cancel
+
+		if(clob_.order_exists(result->order_id)) {
+			std::ignore = clob_.submit(*result);
+		}
+	}
+}
+
+void MarketRequestGenerator::generate_and_post_random_order_request() {
 	double random_value = order_type_distribution(generator);
+
+	std::optional<OrderRequest> request;
 	if(random_value < CANCEL_PROBABILITY) {
-		return generate_cancel_request();
+		request = generate_cancel_request();
+		if(!request) [[unlikely]]{
+			populate_active_orders();
+			return;
+		}
 	}
 	else if(random_value < CANCEL_PROBABILITY + BUY_PROBABILITY) {
-		return generate_new_order_request(OrderRequest::Type::Buy);
+		request = generate_new_order_request(OrderRequest::Type::Buy);
+		if(!request) [[unlikely]] {
+			purge_active_orders();
+			return;
+		}
 	}
 	else {
-		return generate_new_order_request(OrderRequest::Type::Sell);
+		request = generate_new_order_request(OrderRequest::Type::Sell);
+		if(!request) [[unlikely]] {
+			purge_active_orders();
+			return;
+		}
+	}
+	
+	std::ignore = clob_.submit(*request);
+}
+
+void MarketRequestGenerator::launch() {
+	populate_active_orders();
+	while(true) {
+		generate_and_post_random_order_request();
 	}
 }
 }
