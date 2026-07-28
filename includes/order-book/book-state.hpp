@@ -22,12 +22,6 @@ public:
         Order::Quantity quantity = 0;
     };
 
-	struct HeadOrder {
-		Order::ID order_id;
-		Order::Price price;
-		Order::Quantity quantity = 0;
-	};
-
 	struct OrderSnapshot {
 		BestOrderInfo best_bid;
 		BestOrderInfo best_offer;
@@ -84,8 +78,8 @@ public:
 	Update execute(const MarketEvent& event);
 
 	constexpr OrderSnapshot snapshot() const noexcept { return bbo; }
-	constexpr HeadOrder best_opposing_order(Order::Side side) const noexcept;
-	constexpr bool order_exists(Order::ID order_id) const noexcept;
+	Order best_opposing_order(Order::Side side) const noexcept;
+	bool order_exists(Order::ID order_id) const noexcept;
 };
 
 

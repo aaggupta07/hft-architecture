@@ -1,18 +1,20 @@
 #include "book-state.hpp"
 
-constexpr auto BookState::best_opposing_order(Order::Side side) const noexcept -> HeadOrder {
+auto BookState::best_opposing_order(Order::Side side) const noexcept -> Order {
 	if((side == Order::Side::Buy && bbo.best_bid.price == NO_BID)) {
-		return HeadOrder {
+		return Order {
 			.order_id = Order::INVALID_ORDER_ID,
 			.price = NO_BID,
 			.quantity = 0,
+			.side = Order::Side::Buy,
 		};
 	}
 	if((side == Order::Side::Sell && bbo.best_offer.price == NO_OFFER)) {
-		return HeadOrder {
+		return Order {
 			.order_id = Order::INVALID_ORDER_ID,
 			.price = NO_OFFER,
 			.quantity = 0,
+			.side = Order::Side::Sell,
 		};
 	}
 
@@ -20,24 +22,26 @@ constexpr auto BookState::best_opposing_order(Order::Side side) const noexcept -
 		Order::ID head_order_id = price_levels.find(bbo.best_bid.price)->get().head;
 		Order::Quantity head_order_quantity = order_pool.get(order_map.find(head_order_id)->get()).order.quantity;
 
-		return HeadOrder {
+		return Order {
 			.order_id = head_order_id,
 			.price = bbo.best_bid.price,
-			.quantity = head_order_quantity
+			.quantity = head_order_quantity,
+			.side = Order::Side::Buy,
 		};
 	}
 
 	Order::ID head_order_id = price_levels.find(bbo.best_offer.price)->get().head;
 	Order::Quantity head_order_quantity = order_pool.get(order_map.find(head_order_id)->get()).order.quantity;
 
-	return HeadOrder {
+	return Order {
 		.order_id = head_order_id,
 		.price = bbo.best_offer.price,
-		.quantity = head_order_quantity
+		.quantity = head_order_quantity,
+		.side = Order::Side::Sell,
 	};
 }
 
-constexpr bool BookState::order_exists(Order::ID order_id) const noexcept {
+bool BookState::order_exists(Order::ID order_id) const noexcept {
 	return order_map.find(order_id).has_value() ? true : false;
 }
 
