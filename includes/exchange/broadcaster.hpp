@@ -2,6 +2,7 @@
 #define BROADCASTER_HPP
 
 #include <unistd.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <expected>
@@ -17,6 +18,7 @@ private:
 	static constexpr int INVALID = -1;
 
     SocketFD socket_fd_ = INVALID;
+    sockaddr_in destination_{};
 
 public:
     Broadcaster() = default;

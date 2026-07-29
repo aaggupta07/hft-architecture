@@ -7,6 +7,7 @@
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <cstdio>
 #include <print>
 
 namespace exchange {
@@ -31,10 +32,11 @@ EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
 
     auto message =  EncodedMessage(header, payload);
 	message.serialize();
-
 	if constexpr(config::LOGGING) {
-		std::println("[Sequencer] Sequenced Packet # {}", sequencer_counter_ - 1);
+		std::println("[Sequencer] Sequenced packet # {}.", sequencer_counter_ - 1);
+		std::fflush(stdout);
 	}
+
 	return message;
 }
 }

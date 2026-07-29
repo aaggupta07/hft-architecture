@@ -1,7 +1,7 @@
 #include "book-state.hpp"
 
 auto BookState::best_opposing_order(Order::Side side) const noexcept -> Order {
-	if((side == Order::Side::Buy && bbo.best_bid.price == NO_BID)) {
+	if((side == Order::Side::Sell && bbo.best_bid.price == NO_BID)) {
 		return Order {
 			.order_id = Order::INVALID_ORDER_ID,
 			.price = NO_BID,
@@ -9,7 +9,8 @@ auto BookState::best_opposing_order(Order::Side side) const noexcept -> Order {
 			.side = Order::Side::Buy,
 		};
 	}
-	if((side == Order::Side::Sell && bbo.best_offer.price == NO_OFFER)) {
+
+	if((side == Order::Side::Buy && bbo.best_offer.price == NO_OFFER)) {
 		return Order {
 			.order_id = Order::INVALID_ORDER_ID,
 			.price = NO_OFFER,
@@ -18,25 +19,25 @@ auto BookState::best_opposing_order(Order::Side side) const noexcept -> Order {
 		};
 	}
 
-	if(side == Order::Side::Buy) {
-		Order::ID head_order_id = price_levels.find(bbo.best_bid.price)->get().head;
-		Order::Quantity head_order_quantity = order_pool.get(order_map.find(head_order_id)->get()).order.quantity;
+	if(side == Order::Side::Sell) {
+		RestingOrder::Index head_order_index = price_levels.find(bbo.best_bid.price)->get().head;
+		const Order& head_order = order_pool.get(head_order_index).order;
 
 		return Order {
-			.order_id = head_order_id,
+			.order_id = head_order.order_id,
 			.price = bbo.best_bid.price,
-			.quantity = head_order_quantity,
+			.quantity = head_order.quantity,
 			.side = Order::Side::Buy,
 		};
 	}
 
-	Order::ID head_order_id = price_levels.find(bbo.best_offer.price)->get().head;
-	Order::Quantity head_order_quantity = order_pool.get(order_map.find(head_order_id)->get()).order.quantity;
+	RestingOrder::Index head_order_index = price_levels.find(bbo.best_offer.price)->get().head;
+	const Order& head_order = order_pool.get(head_order_index).order;
 
 	return Order {
-		.order_id = head_order_id,
+		.order_id = head_order.order_id,
 		.price = bbo.best_offer.price,
-		.quantity = head_order_quantity,
+		.quantity = head_order.quantity,
 		.side = Order::Side::Sell,
 	};
 }
@@ -191,24 +192,23 @@ void BookState::detach(const RestingOrder& order, PriceLevel& price_level) {
 - Relink the order intrusive linked list
 */
 auto BookState::purge_order(Order::ID resting_order_id) -> Update {
-    RestingOrder::Index order_index = order_map.find_then_remove(resting_order_id)->get();
-    RestingOrder& order = order_pool.get(order_index);
-    return purge_order(order_index, order);
+	RestingOrder::Index order_index = order_map.find(resting_order_id)->get();
+	RestingOrder& order = order_pool.get(order_index);
+	return purge_order(order_index, order);
 }
 
-// REQUIRES: order_map to be advanced to order_id via `find_then_remove()`
 auto BookState::purge_order(RestingOrder::Index order_index, const RestingOrder& resting_order) -> Update {
-    PriceLevel& price_level = price_levels.find_then_remove(resting_order.order.price)->get();
-    price_level.total_quantity -= resting_order.order.quantity;
+	PriceLevel& price_level = price_levels.find(resting_order.order.price)->get();
+	price_level.total_quantity -= resting_order.order.quantity;
     if(price_level.total_quantity == 0) {
-    	price_levels.remove_on_saved_index();
+		price_levels.remove(resting_order.order.price);
         remove_bid_or_offer(resting_order.order);
     }
     else {
         detach(resting_order, price_level);
     }
 
-	order_map.remove_on_saved_index();
+	order_map.remove(resting_order.order.order_id);
 	Update update = update_bbo_reduce(resting_order.order); // Update the BBO
 	order_pool.free(order_index);
 	return update;
@@ -224,7 +224,7 @@ auto BookState::cancel(Order::ID resting_order_id) -> Update {
 - Erase the order from the order_map and deallocate it from the order pool if its quantity hit 0
 */
 auto BookState::trade(Order::ID resting_order_id, Order::Quantity quantity) -> Update {
-    RestingOrder::Index order_index = order_map.find_then_remove(resting_order_id)->get();
+	RestingOrder::Index order_index = order_map.find(resting_order_id)->get();
     RestingOrder& resting_order = order_pool.get(order_index);
 
 	// Logically same as purge order from book's perspective

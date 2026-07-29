@@ -11,7 +11,7 @@
 
 class exchange::EncodedMessage {
 public:
-	static constexpr size_t MAX_WIRE_SIZE = config::MAX_MESSAGE_BYTES + sizeof(MessageHeader);
+	static constexpr size_t MAX_WIRE_SIZE = config::MAX_MESSAGE_BYTES + MessageHeader::PACKED_WIRE_SIZE;
 private:
 	MessageHeader header_;
 	std::array<std::byte, MAX_WIRE_SIZE> buffer_;
@@ -22,7 +22,7 @@ public:
         : header_(header)
     { 
     	assert(payload.size() <= config::MAX_MESSAGE_BYTES);
-        std::ranges::copy(payload, buffer_.data() + sizeof(header_));
+        std::ranges::copy(payload, buffer_.data() + MessageHeader::PACKED_WIRE_SIZE);
 
     }
     
@@ -31,14 +31,15 @@ public:
     }
 
     const std::span<const std::byte> payload() const noexcept {
-        return std::span{buffer_}.subspan(sizeof(header_), header_.payload_length);
+		if(header_.sequence_number == 0) return {};
+        return std::span{buffer_}.subspan(MessageHeader::PACKED_WIRE_SIZE, header_.payload_length);
     }
 
 	const std::span<const std::byte> message() const noexcept {
-		return std::span{buffer_}.subspan(0, sizeof(header_) + header_.payload_length);
+		return std::span{buffer_}.first(header_.wire_size());
 	}
 
-    std::array<std::byte, MAX_WIRE_SIZE> serialize();
+    const std::span<const std::byte> serialize();
 };
 
 #endif

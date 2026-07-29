@@ -12,6 +12,7 @@
 #include <span>
 #include <vector>
 #include <optional>
+#include <stop_token>
 
 namespace exchange{
 struct RetransmitRequest {
@@ -57,7 +58,7 @@ private:
 			std::expected<void, Error> 		stream_packets			(SavedConnection& client);
 			std::expected<void, Error> 		receive_request			(SavedConnection& client);
 			std::expected<void, Error> 		handle_request			(SocketFD connected_socket);
-			std::expected<void, Error> 		run_event_loop			();
+			std::expected<void, Error> 		run_event_loop			(std::stop_token stop_token);
 
 			void 							notify_and_close		(SavedConnection& client, const Error& error) noexcept; // best effort
 			void							close_client			(SavedConnection& client) noexcept;
@@ -71,7 +72,7 @@ public:
 		: retransmit_cache_(retransmit_cache), connection_buffers(config::DEFAULT_CONNECTION_BUFFERS) {}
 
 	std::expected<void, Error> initialize();
-	std::expected<void, Error> start();
+	std::expected<void, Error> start(std::stop_token stop_token);
 };
 
 

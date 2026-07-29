@@ -9,6 +9,7 @@
 #include "config.hpp"
 
 #include <expected>
+#include <stop_token>
 
 namespace exchange {
 class CentralLimitOrderBook {
@@ -19,16 +20,16 @@ private:
 	BookState state_;
 	MarketEventBuffer& buffer_;
 
-	std::expected<void, Error> cancel_order(const OrderRequest& request);
+	std::expected<void, Error> cancel_order(const OrderRequest& request, std::stop_token stop_token);
 
-	bool execute_trade(Order& new_order);
-	void add_order(Order& new_order);
-	Order::ID buy_order(const OrderRequest& request);
-	Order::ID sell_order(const OrderRequest& request);
+	bool execute_trade(Order& new_order, std::stop_token stop_token);
+	void add_order(Order& new_order, std::stop_token stop_token);
+	Order::ID buy_order(const OrderRequest& request, std::stop_token stop_token);
+	Order::ID sell_order(const OrderRequest& request, std::stop_token stop_token);
 
 public:
 	explicit constexpr CentralLimitOrderBook(MarketEventBuffer& buffer): buffer_(buffer) {}
-	std::expected<Order::ID, Error> submit(const OrderRequest& request);
+	std::expected<Order::ID, Error> submit(const OrderRequest& request, std::stop_token stop_token = {});
 	BookState::OrderSnapshot snapshot() const noexcept { return state_.snapshot(); }
 	bool order_exists(Order::ID order_id) const noexcept { return state_.order_exists(order_id); }
 };

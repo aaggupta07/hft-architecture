@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cassert>
+#include <cstdio>
 #include <print>
 #include <tuple>
 
@@ -41,6 +42,7 @@ auto RetransmitRequest::serialize(const RetransmitRequest &request) {
 
 constexpr void RetransmitServer::log(const Error& error) const {
 	std::println("[TCP Retransmit] Error: {}", error);
+	std::fflush(stdout);
 }
 
 std::expected<void, Error> RetransmitServer::set_socket_nonblocking(int socket_fd) {
@@ -234,11 +236,12 @@ auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
 		return {};
 }
 
-auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
+auto RetransmitServer::run_event_loop(std::stop_token stop_token) -> std::expected<void, Error> {
 	std::array<struct kevent, config::MAX_TOTAL_CONNECTIONS * 2> events;
+	constexpr timespec stop_check_interval { .tv_sec = 0, .tv_nsec = config::KQUEUE_TIMEOUT_NS };
 
-	while(true) {
-		int num_of_events = kevent(event_queue_, nullptr, 0, events.data(), events.size(), nullptr);
+	while(!stop_token.stop_requested()) {
+		int num_of_events = kevent(event_queue_, nullptr, 0, events.data(), events.size(), &stop_check_interval);
 		if(num_of_events == INVALID && errno == EINTR) continue;
 		else if(num_of_events == INVALID) [[unlikely]]  {
 			close_server();
@@ -282,7 +285,7 @@ auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
 	return {};
 }
 
-auto RetransmitServer::start() -> std::expected<void, Error> {
+auto RetransmitServer::start(std::stop_token stop_token) -> std::expected<void, Error> {
 	if(socket_fd_ == INVALID) {
 		auto result = initialize();
 		if(!result) [[unlikely]] return std::unexpected(result.error());
@@ -295,14 +298,18 @@ auto RetransmitServer::start() -> std::expected<void, Error> {
 
 	if constexpr(config::LOGGING) {
 		std::println("[TCP Retransmit] Server started.");
+		std::fflush(stdout);
 	}
-	return run_event_loop();
+	return run_event_loop(stop_token);
 }
 
 
 auto RetransmitServer::stream_packets(SavedConnection& client) -> std::expected<void, Error> {
 	assert(client.request.has_value());
 	assert(client.connection.socket() >= 0);
+	if(client.request->first_packet == 0) {
+		return std::unexpected(Error::InvalidPacket);
+	}
 
 	if(client.connection.status() == Connection<N>::Status::PartialSend) {
 		auto result = client.connection.send();
@@ -313,7 +320,8 @@ auto RetransmitServer::stream_packets(SavedConnection& client) -> std::expected<
 	}
 
 	for(; client.request->first_packet < client.request->last_packet; ++client.request->first_packet) {
-		auto cache_result = retransmit_cache_.try_get_item(client.request->first_packet);
+		// The sequencer begins numbering at 1, so the first packet maps to slot 0 
+		auto cache_result = retransmit_cache_.try_get_item(client.request->first_packet - 1);
 		if(!cache_result) {
 			switch(cache_result.error()) {
 				case Cache::Error::DataTooOld:

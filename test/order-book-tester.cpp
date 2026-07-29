@@ -10,11 +10,12 @@ constexpr void print_bbo(const BookState& order_book) {
 	std::string best_bid_price      = (bbo.best_bid.price == BookState::NO_BID)        ? "None" : std::to_string(bbo.best_bid.price);
     std::string best_offer_price    = (bbo.best_offer.price == BookState::NO_OFFER)    ? "None" : std::to_string(bbo.best_offer.price);
     
-    std::println(
+	std::println(
 		"Best Bid \t Price {} \t Quantity {}\n"
 		"Best Offer \t Price {} \t Quantity {}\n",
 		best_bid_price, bbo.best_bid.quantity, best_offer_price, bbo.best_offer.quantity
 	);
+	std::fflush(stdout);
 }
 
 /*
@@ -28,6 +29,7 @@ void log_update(const BookState::Update& update, const BookState& order_book) {
 	static size_t action_counter = 0;
 
 	std::println("Order Book Action # {}", ++action_counter);
+	std::fflush(stdout);
 	switch(update) {
 		using enum BookState::Update;
 
@@ -38,6 +40,7 @@ void log_update(const BookState::Update& update, const BookState& order_book) {
 				"New Best Bid\n "
 					"----------------\n"
 			);
+			std::fflush(stdout);
 			print_bbo(order_book);
 			break;
 		case NewBestOffer:
@@ -45,6 +48,7 @@ void log_update(const BookState::Update& update, const BookState& order_book) {
 				"New Best Offer\n "
 					"----------------\n"
 			);
+			std::fflush(stdout);
 			print_bbo(order_book);
 			break;
 	}
@@ -65,6 +69,7 @@ bool parse_and_execute(const std::string& string_to_parse, BookState& order_book
 	
 	if(!registry.contains(verb)) {
 		std::println(stderr, "[Parser] Verb {} unknown.", verb);
+		std::fflush(stderr);
         return false;
 	}
 
@@ -82,6 +87,7 @@ bool parse_and_execute(const std::string& string_to_parse, BookState& order_book
 
 			if(!side_map.contains(side)) {
 				std::println(stderr, "[Parser] Side {} unknown.", verb);
+				std::fflush(stderr);
 				return false;
 			}
 

@@ -8,7 +8,8 @@
 namespace exchange{
 class BinaryOrderExchangeFormat {
 public:
-	static constexpr size_t BUFFER_SIZE = sizeof(MarketEvent);
+	static constexpr size_t BUFFER_SIZE = sizeof(MarketEvent::Type) 
+		+ sizeof(Order::ID) + sizeof(Order::Price) + sizeof(Order::Quantity) + sizeof(Order::Side);
 
 	BinaryOrderExchangeFormat() = delete;
 	BinaryOrderExchangeFormat(const BinaryOrderExchangeFormat&) = delete;
@@ -16,8 +17,8 @@ public:
 	BinaryOrderExchangeFormat(BinaryOrderExchangeFormat&&) = delete;
 	BinaryOrderExchangeFormat& operator=(BinaryOrderExchangeFormat&&) = delete;
 
-	static std::array<std::byte, sizeof(MarketEvent)> encode(const MarketEvent& event);
-	static MarketEvent decode(std::span<const std::byte> buffer);
+	static std::array<std::byte, BUFFER_SIZE> encode(const MarketEvent& event);
+	static MarketEvent decode(const std::span<const std::byte> buffer);
 };
 }
 

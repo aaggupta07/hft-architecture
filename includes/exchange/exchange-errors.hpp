@@ -2,6 +2,8 @@
 #define EXCHANGE_ERRORS_HPP
 
 #include <format>
+#include <cerrno>
+#include <cstring>
 #include <string_view>
 
 namespace exchange {
@@ -19,6 +21,7 @@ enum class Error {
 
 	StartBroadcast,
 	InvalidBroadcastIP,
+	InvalidBroadcastInterface,
     Send,
 
 	ServerBusy,
@@ -110,12 +113,34 @@ struct std::formatter<exchange::Error> : std::formatter<std::string_view> {
 			case InvalidBroadcastIP:
 				name = "InvalidBroadcastIP";
 				break;
+			case InvalidBroadcastInterface:
+				name = "InvalidBroadcastInterface";
+				break;
 			default:
 				name = "UnknownError";
 				break;
 		}
 
-		return std::formatter<std::string_view>::format(name, context);
+		switch(error) {
+			case StartBroadcast:
+			case Send:
+			case StartRetransmitServer:
+			case SetSocketNonblocking:
+			case ClientConnectionClosed:
+			case WouldBlock:
+			case ReceiveFromClient:
+			case SendToClient:
+			case NewConnection:
+			case RegisterEvent:
+			case EventQueue:
+			case ServerFatal:
+				{
+					const int error_number = errno;
+					return std::format_to(context.out(), "{} (errno {}: {})", name, error_number, std::strerror(error_number));
+				}
+			default:
+				return std::formatter<std::string_view>::format(name, context);
+		}
 	}
 };
 

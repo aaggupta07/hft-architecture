@@ -4,7 +4,7 @@
 
 namespace exchange {
 void MessageHeader::serialize(std::span<std::byte> buffer) const {
-    assert(buffer.size() >= sizeof(MessageHeader));
+    assert(buffer.size() >= PACKED_WIRE_SIZE);
     
     SequenceID network_sequence_number = htonll(sequence_number);
     Length network_payload_length = htons(payload_length);

@@ -15,8 +15,13 @@ using Length = uint16_t;
 // A sequence number of 0 is reserved for error messages
 // In this case, the payload_length field contains the error code, and the buffer is empty
 struct MessageHeader {
+	static constexpr size_t PACKED_WIRE_SIZE = sizeof(SequenceID) + sizeof(Length);
     SequenceID sequence_number;
     Length payload_length;
+
+    constexpr size_t wire_size() const noexcept {
+        return sequence_number == 0 ? PACKED_WIRE_SIZE : PACKED_WIRE_SIZE + payload_length;
+    }
 
     void serialize(std::span<std::byte> buffer) const;
 };

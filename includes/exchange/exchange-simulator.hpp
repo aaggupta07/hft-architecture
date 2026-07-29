@@ -15,14 +15,18 @@
 #include "broadcaster.hpp"
 #include "tcp-retransmit.hpp"
 
+#include <stop_token>
+#include <string_view>
+
 
 class exchange::ExchangeSimulator {
 private:
 	constexpr void log(const Error& error) const;
-	void launch_retransmit_server();
-	void launch_order_generator();
+	constexpr void log(std::string_view message) const;
+	void launch_retransmit_server(std::stop_token stop_token);
+	void launch_order_generator(std::stop_token stop_token);
 
-	void run();
+	void run(std::stop_token stop_token);
 
 	using MarketEventBuffer = SharedRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
 	
@@ -36,6 +40,7 @@ private:
 	RetransmitCache retransmit_cache_;
 	RetransmitServer retransmit_server_;
 	Broadcaster real_time_feed_;
+	std::stop_source stop_source_;
 	
 public:
 	ExchangeSimulator();
@@ -46,7 +51,8 @@ public:
 	ExchangeSimulator(ExchangeSimulator&&) = delete;
 	ExchangeSimulator& operator=(ExchangeSimulator&&) = delete;
 
-	void start();
+	void start(std::stop_token stop_token = {});
+	void request_stop() noexcept { stop_source_.request_stop(); }
 };
 
 #endif

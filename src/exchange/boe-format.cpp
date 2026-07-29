@@ -5,9 +5,8 @@
 #include <arpa/inet.h>
 
 namespace exchange {
-std::array<std::byte, sizeof(MarketEvent)> BinaryOrderExchangeFormat::encode(const MarketEvent& event) {
-	// TODO: Implement encoding logic for MarketEvent to binary format
-	std::array<std::byte, sizeof(MarketEvent)> buffer;
+auto BinaryOrderExchangeFormat::encode(const MarketEvent& event) -> std::array<std::byte, BUFFER_SIZE> {
+	std::array<std::byte, BUFFER_SIZE> buffer;
 	size_t offset = 0;
 
 	Order order_network {
@@ -31,8 +30,8 @@ std::array<std::byte, sizeof(MarketEvent)> BinaryOrderExchangeFormat::encode(con
 	return buffer;
 }
 
-MarketEvent BinaryOrderExchangeFormat::decode(std::span<const std::byte> buffer) {
-	assert(buffer.size() == sizeof(MarketEvent));
+MarketEvent BinaryOrderExchangeFormat::decode(const std::span<const std::byte> buffer) {
+	assert(buffer.size() == BUFFER_SIZE);
 	MarketEvent event {};
 	size_t offset = 0;
 

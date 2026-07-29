@@ -9,6 +9,7 @@
 #include "exchange-errors.hpp"
 
 #include <random>
+#include <stop_token>
 
 namespace exchange {
 class MarketRequestGenerator {
@@ -26,17 +27,17 @@ private:
 	CentralLimitOrderBook& clob_; // Used for price generation
 
 	Order::Price generate_price(OrderRequest::Type type, bool aggressive);
-	void generate_and_post_cancel_request();
-	void generate_and_post_new_order_request(OrderRequest::Type type);
+	void generate_and_post_cancel_request(std::stop_token stop_token);
+	void generate_and_post_new_order_request(OrderRequest::Type type, std::stop_token stop_token);
 	OrderRequest generate_passive_order_request(OrderRequest::Type type);
 	OrderRequest generate_aggressive_order_request(OrderRequest::Type type);
 
-	void populate_active_orders();
-	void purge_active_orders();
+	void populate_active_orders(std::stop_token stop_token);
+	void purge_active_orders(std::stop_token stop_token);
 
-	void generate_and_post_random_order_request();
+	void generate_and_post_random_order_request(std::stop_token stop_token);
 
-	static void log(const OrderRequest& order_request); 
+	static void log(const OrderRequest& order_request);
 	static void log_error(const Error& error);
 
 public:
@@ -46,7 +47,7 @@ public:
 		large_quantity_distribution(config::MIN_LARGE_QUANTITY, config::MAX_LARGE_QUANTITY),
 		clob_(order_book) {}
 	
-	void start();
+	void start(std::stop_token stop_token);
 };
 }
 

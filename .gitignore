@@ -5,14 +5,11 @@
 bin/
 obj/
 
-# CMake generated files
-Makefile
 compile_commands.json
 .clangd
 
 # Diagrams
-diagrams/*
-*.png
+private-diagrams/*
 
 # Executables
 *.exe

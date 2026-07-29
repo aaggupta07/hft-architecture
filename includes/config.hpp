@@ -27,7 +27,10 @@ namespace config {
 namespace exchange::config {
 	// Broadcast Configuration
 	using Port = uint16_t;
-	inline constexpr char	MCAST_GROUP[]	= "224.0.1.5";
+	inline constexpr char	MCAST_GROUP[]	= "239.255.0.1";
+
+	// Use `ifconfig` to find the UDP multicast interface on the local network if 0.0.0.0 does not work
+	inline constexpr char	MCAST_INTERFACE[] = "0.0.0.0";
 	inline constexpr Port	MCAST_PORT		= 50000;
 	
 	// Central Limit Order Book Configuration
@@ -45,6 +48,8 @@ namespace exchange::config {
 	inline constexpr bool 			LOGGING						= true;
 	inline constexpr size_t 		DEFAULT_CONNECTION_BUFFERS 	= 5;
 	inline constexpr size_t 		MAX_TOTAL_CONNECTIONS 		= 25;
+	// kqueue timeout: Sleeps for up to this much time before checking for a shutdown request
+	inline constexpr size_t 		KQUEUE_TIMEOUT_NS 			= 100'000'000;
 
 	// Order Generator Configuration
 	inline constexpr double BUY_PROBABILITY 		= 0.4;
@@ -55,15 +60,15 @@ namespace exchange::config {
 	 * Highly aggressive orders cross the spread with larger price variance and larger quantity.
 	 * They are very likely to cross multiple resting orders, and possibly be partially filled. */ 
 	inline constexpr double AGGRESSIVE_ORDER_PROBABILITY = 0.02; 
-	inline constexpr Order::Quantity MIN_LARGE_QUANTITY = 400;
+	inline constexpr Order::Quantity MIN_LARGE_QUANTITY = 100;
 	inline constexpr Order::Quantity MAX_LARGE_QUANTITY = 600;
 
 	inline constexpr Order::Price MIN_PRICE = 1;
 	inline constexpr Order::Price MAX_PRICE = 1000;
 
 	// Used as the midpoint for generating prices when the order book is empty
-	inline constexpr Order::Price DEFAULT_BUY_PRICE = 400;
-	inline constexpr Order::Price DEFAULT_SELL_PRICE = 600;
+	inline constexpr Order::Price DEFAULT_BUY_PRICE = 350;
+	inline constexpr Order::Price DEFAULT_SELL_PRICE = 650;
 
 	/* Generated orders uniformly cluster around the best bid and ask prices, 
 	 * with a variance of PRICE_VARIANCE on each side of the best price. 

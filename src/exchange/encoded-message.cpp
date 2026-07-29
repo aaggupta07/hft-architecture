@@ -4,9 +4,9 @@
 #include <span>
 
 namespace exchange{
-auto EncodedMessage::serialize() -> std::array<std::byte, MAX_WIRE_SIZE> {
-    auto buffer_span = std::span{buffer_}.subspan(0, sizeof(header_));
+auto EncodedMessage::serialize() -> const std::span<const std::byte> {
+    auto buffer_span = std::span{buffer_}.subspan(0, MessageHeader::PACKED_WIRE_SIZE);
     header_.serialize(buffer_span);
-    return buffer_;
+    return message();
 }
 }

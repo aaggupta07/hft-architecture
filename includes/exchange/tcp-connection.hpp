@@ -82,7 +82,7 @@ public:
 
 	constexpr void save(const std::span<const std::byte> bytes) {
 		assert(connection_status_ == Status::Clear || connection_status_ == Status::SavedMessage);
-		assert(bytes.size() < buffer_.size() - head_);
+		assert(bytes.size() <= buffer_.size() - head_);
 		std::ranges::copy(bytes, buffer_.data() + head_);
 		head_ += bytes.size();
 		connection_status_ = Status::SavedMessage;

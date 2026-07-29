@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <utility>
 #include <new>
+#include <stop_token>
 
 /*
  * An efficient, lazy-initialized single-producer single-consumer 
@@ -97,6 +98,15 @@ private:
         }
     }
 
+    template <typename U>
+    bool wait_push_internal(U&& item, std::stop_token stop_token) {
+        while (!try_push_internal(std::forward<U>(item))) {
+            if (stop_token.stop_requested()) return false;
+            wait_for_progress();
+        }
+        return true;
+    }
+
 public:
     SharedRingBuffer() = default;
     ~SharedRingBuffer() = default;
@@ -116,6 +126,14 @@ public:
 
     void wait_push(const T& item) {
         wait_push_internal(item);
+    }
+
+    bool wait_push(T&& item, std::stop_token stop_token) {
+        return wait_push_internal(std::move(item), stop_token);
+    }
+
+    bool wait_push(const T& item, std::stop_token stop_token) {
+        return wait_push_internal(item, stop_token);
     }
 
     std::optional<T> try_pop() {
@@ -138,6 +156,14 @@ public:
             }
             wait_for_progress();
         }
+    }
+
+    std::optional<T> wait_pop(std::stop_token stop_token) {
+        while (!stop_token.stop_requested()) {
+            if (auto value = try_pop()) return value;
+            wait_for_progress();
+        }
+        return std::nullopt;
     }
 
     // These observations are inherently racy with the other endpoint
