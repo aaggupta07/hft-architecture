@@ -1,8 +1,8 @@
 #ifndef EXCHANGE_SIMULATOR_HPP
 #define EXCHANGE_SIMULATOR_HPP
 
-#include "exchange-errors.hpp"
 #include "protocol.hpp"
+#include "exchange-errors.hpp"
 
 #include "order-generator.hpp"
 #include "clob.hpp"
@@ -18,7 +18,7 @@
 
 class exchange::ExchangeSimulator {
 private:
-	void initialize();
+	constexpr void log(const Error& error) const;
 	void launch_retransmit_server();
 	void launch_order_generator();
 
@@ -31,6 +31,11 @@ private:
 	MarketRequestGenerator order_generator_;
 
 	Sequencer<BinaryOrderExchangeFormat> sequencer_;
+
+	using RetransmitCache = CircularCache<EncodedMessage, config::RETRANSMIT_CACHE_SIZE>;
+	RetransmitCache retransmit_cache_;
+	RetransmitServer retransmit_server_;
+	Broadcaster real_time_feed_;
 	
 public:
 	ExchangeSimulator();

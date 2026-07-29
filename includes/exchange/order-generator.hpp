@@ -5,9 +5,10 @@
 #include "clob.hpp"
 #include "random-container.hpp"
 #include "config.hpp"
+#include "order.hpp"
+#include "exchange-errors.hpp"
 
 #include <random>
-#include <optional>
 
 namespace exchange {
 class MarketRequestGenerator {
@@ -25,8 +26,8 @@ private:
 	CentralLimitOrderBook& clob_; // Used for price generation
 
 	Order::Price generate_price(OrderRequest::Type type, bool aggressive);
-	std::optional<OrderRequest> generate_cancel_request();
-	std::optional<OrderRequest> generate_new_order_request(OrderRequest::Type type);
+	void generate_and_post_cancel_request();
+	void generate_and_post_new_order_request(OrderRequest::Type type);
 	OrderRequest generate_passive_order_request(OrderRequest::Type type);
 	OrderRequest generate_aggressive_order_request(OrderRequest::Type type);
 
@@ -35,8 +36,11 @@ private:
 
 	void generate_and_post_random_order_request();
 
+	static void log(const OrderRequest& order_request); 
+	static void log_error(const Error& error);
+
 public:
-	constexpr MarketRequestGenerator(CentralLimitOrderBook& order_book)
+	explicit constexpr MarketRequestGenerator(CentralLimitOrderBook& order_book)
 		: order_type_distribution(0.0, 1.0),
 		quantity_distribution(config::MIN_QUANTITY, config::MAX_QUANTITY),
 		large_quantity_distribution(config::MIN_LARGE_QUANTITY, config::MAX_LARGE_QUANTITY),

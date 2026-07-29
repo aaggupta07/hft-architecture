@@ -40,7 +40,7 @@ auto RetransmitRequest::serialize(const RetransmitRequest &request) {
 }
 
 constexpr void RetransmitServer::log(const Error& error) const {
-	std::println("{}", error);
+	std::println("[TCP Retransmit] Error: {}", error);
 }
 
 std::expected<void, Error> RetransmitServer::set_socket_nonblocking(int socket_fd) {
@@ -130,7 +130,7 @@ void RetransmitServer::close_client(SavedConnection& client) noexcept {
 	if(event_queue_ >= 0) unregister(event_queue_, client.connection.socket());
 	client.connection.close();
 	client.request = std::nullopt;
-	--current_connections;
+	--current_connections_;
 }
 
 auto RetransmitServer::initialize() -> std::expected<void, Error> {
@@ -141,7 +141,7 @@ auto RetransmitServer::initialize() -> std::expected<void, Error> {
 			return std::unexpected(result.error());
 		}
 		socket_fd_ = *result;
-		current_connections = 1;
+		current_connections_ = 1;
 	}
 
 	// Create event queue [BSD/macOS only]
@@ -159,7 +159,9 @@ void RetransmitServer::close_server() noexcept {
 		socket_fd_ = INVALID;
 	}
 	for(SavedConnection& client: connection_buffers) {
-		notify_and_close(client, Error::ServerFatal);
+		if(client.connection.socket() >= 0) {
+			notify_and_close(client, Error::ServerFatal);
+		}
 	}
 	if(event_queue_ >= 0) {
 		close(event_queue_);
@@ -168,7 +170,7 @@ void RetransmitServer::close_server() noexcept {
 }
 
 auto RetransmitServer::get_connected_socket() -> std::expected<SocketFD, Error> {
-	if(current_connections >= config::MAX_TOTAL_CONNECTIONS) {
+	if(current_connections_ >= config::MAX_TOTAL_CONNECTIONS) {
 		return std::unexpected(Error::ServerBusy);
 	}
 
@@ -226,6 +228,7 @@ auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
 			connection_buffers.emplace_back(SavedConnection());
 		}
 		connection_buffers[new_socket].connection.set_socket(new_socket);
+		current_connections_++;
 	}
 	no_more_connections:
 		return {};
@@ -280,15 +283,19 @@ auto RetransmitServer::run_event_loop() -> std::expected<void, Error> {
 }
 
 auto RetransmitServer::start() -> std::expected<void, Error> {
-	if(socket_fd_ == INVALID) [[unlikely]] {
+	if(socket_fd_ == INVALID) {
 		auto result = initialize();
-		if(!result) return std::unexpected(result.error());
+		if(!result) [[unlikely]] return std::unexpected(result.error());
 	}
+
 	int status = listen(socket_fd_, config::MAX_PENDING_CONNECTIONS);
 	if(status == INVALID) [[unlikely]] {
 		return std::unexpected(Error::StartRetransmitServer);
 	}
 
+	if constexpr(config::LOGGING) {
+		std::println("[TCP Retransmit] Server started.");
+	}
 	return run_event_loop();
 }
 

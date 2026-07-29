@@ -3,8 +3,8 @@
 
 #include "protocol.hpp"
 #include "exchange-errors.hpp"
-#include "book-state.hpp"
 #include "order.hpp"
+#include "book-state.hpp"
 #include "ring-buffer.hpp"
 #include "config.hpp"
 
@@ -23,12 +23,12 @@ private:
 
 	bool execute_trade(Order& new_order);
 	void add_order(Order& new_order);
-	void buy_order(const OrderRequest& request);
-	void sell_order(const OrderRequest& request);
+	Order::ID buy_order(const OrderRequest& request);
+	Order::ID sell_order(const OrderRequest& request);
 
 public:
-	CentralLimitOrderBook(MarketEventBuffer& buffer): buffer_(buffer) {}
-	std::expected<void, Error> submit(const OrderRequest& request);
+	explicit constexpr CentralLimitOrderBook(MarketEventBuffer& buffer): buffer_(buffer) {}
+	std::expected<Order::ID, Error> submit(const OrderRequest& request);
 	BookState::OrderSnapshot snapshot() const noexcept { return state_.snapshot(); }
 	bool order_exists(Order::ID order_id) const noexcept { return state_.order_exists(order_id); }
 };

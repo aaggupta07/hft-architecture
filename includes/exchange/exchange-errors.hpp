@@ -2,6 +2,7 @@
 #define EXCHANGE_ERRORS_HPP
 
 #include <format>
+#include <string_view>
 
 namespace exchange {
 enum class Error {
@@ -17,6 +18,7 @@ enum class Error {
 	InvalidOrderRequest = 7,
 
 	StartBroadcast,
+	InvalidBroadcastIP,
     Send,
 
 	ServerBusy,
@@ -37,57 +39,83 @@ enum class Error {
 }
 
 template<>
-struct std::formatter<exchange::Error> {
-	constexpr auto parse(std::format_parse_context& context) {
-		return context.begin();
-	}
-
-	auto format(const exchange::Error& error, std::format_context& _) const {
+struct std::formatter<exchange::Error> : std::formatter<std::string_view> {
+	auto format(const exchange::Error& error, std::format_context& context) const {
 		using enum exchange::Error;
+		std::string_view name;
 		switch(error) {
 			case PacketTooOld:
-				return "PacketTooOld";
+				name = "PacketTooOld";
+				break;
 			case InvalidPacket:
-				return "InvalidPacket";
+				name = "InvalidPacket";
+				break;
 			case PacketUnavailable:
-				return "PacketUnavailable";
+				name = "PacketUnavailable";
+				break;
 			case ClientConnection:
-				return "ClientConnection";
+				name = "ClientConnection";
+				break;
 			case ServerFatal:
-				return "ServerFatal";		
+				name = "ServerFatal";
+				break;
 			case StartBroadcast:
-				return "StartBroadcast";
+				name = "StartBroadcast";
+				break;
 			case Send:
-				return "Send";
+				name = "Send";
+				break;
 			case ServerBusy:
-				return "ServerBusy";
+				name = "ServerBusy";
+				break;
 			case StartRetransmitServer:
-				return "StartRetransmitServer";
+				name = "StartRetransmitServer";
+				break;
 			case AddressInfo:
-				return "AddressInfo";
+				name = "AddressInfo";
+				break;
 			case SetSocketNonblocking:
-				return "SetSocketNonblocking";
+				name = "SetSocketNonblocking";
+				break;
 			case ClientConnectionClosed:
-				return "ClientConnectionClosed";
+				name = "ClientConnectionClosed";
+				break;
 			case WouldBlock:
-				return "WouldBlock";
+				name = "WouldBlock";
+				break;
 			case ReceiveFromClient:
-				return "ReceiveFromClient";
+				name = "ReceiveFromClient";
+				break;
 			case SendToClient:
-				return "SendToClient";
+				name = "SendToClient";
+				break;
 			case NewConnection:
-				return "NewConnection";
+				name = "NewConnection";
+				break;
 			case RequestHandler:
-				return "RequestHandler";
+				name = "RequestHandler";
+				break;
 			case RegisterEvent:
-				return "RegisterEvent";
+				name = "RegisterEvent";
+				break;
 			case EventQueue:
-				return "EventQueue";
+				name = "EventQueue";
+				break;
 			case OrderDoesNotExist:
-				return "OrderDoesNotExist";
+				name = "OrderDoesNotExist";
+				break;
 			case InvalidOrderRequest:
-				return "InvalidOrderRequest";
+				name = "InvalidOrderRequest";
+				break;
+			case InvalidBroadcastIP:
+				name = "InvalidBroadcastIP";
+				break;
+			default:
+				name = "UnknownError";
+				break;
 		}
+
+		return std::formatter<std::string_view>::format(name, context);
 	}
 };
 

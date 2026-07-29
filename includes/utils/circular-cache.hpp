@@ -30,9 +30,6 @@ private:
 	alignas(config::CACHE_LINE_SIZE) std::array<std::atomic<Index>, CAPACITY> sequence_;
 	alignas(config::CACHE_LINE_SIZE) std::array<std::atomic<T>, CAPACITY> buffer_;
 	
-	
-	void put_item_internal(T&& item);
-	
 public:
 	constexpr CircularCache() = default;
 
@@ -44,8 +41,7 @@ public:
 
 	std::expected<T, Error> try_get_item	(Index index) const;
 	std::expected<T, Error> wait_get_item	(Index index) const;
-	void 					put_item(T&& item) 			{	put_item_internal(std::move(item));	};
-	void					put_item(const T& item)		{	put_item_internal(item); };
+	void					put_item(const T& item);
 };
 
 template<typename T, size_t CAPACITY>
@@ -73,7 +69,7 @@ auto CircularCache<T, CAPACITY>::try_get_item(Index item_index) const -> std::ex
 }
 
 template<typename T, size_t CAPACITY>
-void CircularCache<T, CAPACITY>::put_item_internal(T&& item) {
+void CircularCache<T, CAPACITY>::put_item(const T& item) {
 	Index write_index = write_index_ & MASK;
 	sequence_[write_index].store(IS_LOCKED, std::memory_order_release); // Lock SeqLock
 	buffer_[write_index].store(item, std::memory_order_relaxed);

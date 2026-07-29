@@ -1,14 +1,15 @@
 #include "protocol.hpp"
 #include <cassert>
+#include <cstring>
 
 namespace exchange {
-void MessageHeader::serialize(std::span<Byte> buffer) const {
+void MessageHeader::serialize(std::span<std::byte> buffer) const {
     assert(buffer.size() >= sizeof(MessageHeader));
     
     SequenceID network_sequence_number = htonll(sequence_number);
     Length network_payload_length = htons(payload_length);
-    std::memcpy(buffer.data(), &network_sequence_number, sizeof(sequence_number));
-    std::memcpy(buffer.data() + sizeof(network_payload_length), &network_payload_length, sizeof(payload_length));
-} 
+    std::memcpy(buffer.data(), &network_sequence_number, sizeof(network_sequence_number));
+    std::memcpy(buffer.data() + sizeof(network_sequence_number), &network_payload_length, sizeof(network_payload_length));
+}
 
 }

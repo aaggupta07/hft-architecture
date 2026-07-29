@@ -3,22 +3,21 @@
 #include "book-state.hpp"
 
 namespace exchange {
-std::expected<void, Error> CentralLimitOrderBook::submit(const OrderRequest& request) {
+std::expected<Order::ID, Error> CentralLimitOrderBook::submit(const OrderRequest& request) {
 	switch(request.type) {
 		case OrderRequest::Type::Buy:
-			buy_order(request);
-			return {};
+			return buy_order(request);
 		case OrderRequest::Type::Sell:
-			sell_order(request);
-			return {};
+			return sell_order(request);
 		case OrderRequest::Type::Cancel:
-			return cancel_order(request);
+			auto result =  cancel_order(request);
+			if(!result) return std::unexpected(result.error());
+			return Order::INVALID_ORDER_ID;
 	}
-	return {};
 }
 
 bool CentralLimitOrderBook::execute_trade(Order& new_order) {
-	const Order best_resting = state_.best_opposing_order(Order::Side::Sell);
+	const Order best_resting = state_.best_opposing_order(new_order.side);
 	if(	(best_resting.order_id == Order::INVALID_ORDER_ID) ||
 		(new_order.side == Order::Side::Buy && new_order.price < best_resting.price) || 
 		(new_order.side == Order::Side::Sell && new_order.price > best_resting.price)) {
@@ -48,7 +47,7 @@ void CentralLimitOrderBook::add_order(Order& new_order) {
 	buffer_.wait_push(add);
 }
 
-void CentralLimitOrderBook::buy_order(const OrderRequest& request) {
+Order::ID CentralLimitOrderBook::buy_order(const OrderRequest& request) {
 	Order order {
 		.price = request.price,
 		.quantity = request.quantity,
@@ -61,10 +60,13 @@ void CentralLimitOrderBook::buy_order(const OrderRequest& request) {
 	if(order.quantity != 0) {
 		order.order_id = next_order_id_++;
 		add_order(order);
+		return order.order_id;
 	}
+
+	return Order::INVALID_ORDER_ID;
 }
 
-void CentralLimitOrderBook::sell_order(const OrderRequest& request) {
+Order::ID CentralLimitOrderBook::sell_order(const OrderRequest& request) {
 	Order order {
 		.price = request.price,
 		.quantity = request.quantity,
@@ -77,7 +79,9 @@ void CentralLimitOrderBook::sell_order(const OrderRequest& request) {
 	if(order.quantity != 0) {
 		order.order_id = next_order_id_++;
 		add_order(order);
+		return order.order_id;
 	}
+	return Order::INVALID_ORDER_ID;
 }
 
 std::expected<void, Error> CentralLimitOrderBook::cancel_order(const OrderRequest& request) {

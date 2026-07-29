@@ -12,7 +12,7 @@ std::array<std::byte, sizeof(MarketEvent)> BinaryOrderExchangeFormat::encode(con
 
 	Order order_network {
 		.order_id = htonll(event.order.order_id),
-		.price = htonl(event.order.price),
+		.price = static_cast<Order::Price>(htonl(static_cast<uint32_t>(event.order.price))),
 		.quantity = htonl(event.order.quantity),
 		.side = event.order.side,
 	};
@@ -33,7 +33,7 @@ std::array<std::byte, sizeof(MarketEvent)> BinaryOrderExchangeFormat::encode(con
 
 MarketEvent BinaryOrderExchangeFormat::decode(std::span<const std::byte> buffer) {
 	assert(buffer.size() == sizeof(MarketEvent));
-	MarketEvent event;
+	MarketEvent event {};
 	size_t offset = 0;
 
 	std::memcpy(&event.type, buffer.data() + offset, sizeof(event.type));
@@ -46,6 +46,10 @@ MarketEvent BinaryOrderExchangeFormat::decode(std::span<const std::byte> buffer)
 	offset += sizeof(event.order.quantity);
 	std::memcpy(&event.order.side, buffer.data() + offset, sizeof(event.order.side));
 	offset += sizeof(event.order.side);
+
+	event.order.order_id = ntohll(event.order.order_id);
+	event.order.price = static_cast<Order::Price>(ntohl(static_cast<uint32_t>(event.order.price)));
+	event.order.quantity = ntohl(event.order.quantity);
 
 	return event;
 }

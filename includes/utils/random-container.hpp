@@ -76,6 +76,14 @@ public:
 	size_t capacity() const noexcept {
 		return CAPACITY;
 	}
+
+	bool is_full() const noexcept {
+		return size_ == CAPACITY;
+	}
+
+	bool is_empty() const noexcept {
+		return size_ == 0;
+	}
 };
 
 #endif

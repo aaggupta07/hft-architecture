@@ -40,18 +40,11 @@ class CentralLimitOrderBook;
 class BinaryOrderExchangeFormat;
 class EncodedMessage;
 
-template<typename T>
-concept ConvertibleToSpan = requires {
-	typename std::ranges::range_value_t<T>;
-} && (
-	std::convertible_to<T, std::span<std::ranges::range_value_t<T>>> ||
-	std::convertible_to<T, std::span<const std::ranges::range_value_t<T>>>
-);
-
-
 template<typename Encoder>
 concept BinaryEncoder = requires(Encoder encoder, const MarketEvent& event) {
-    {Encoder::encode(event)} -> ConvertibleToSpan;
+	{Encoder::BUFFER_SIZE} -> std::convertible_to<size_t>;
+	typename std::integral_constant<std::size_t, Encoder::BUFFER_SIZE>;
+    {Encoder::encode(event)} -> std::convertible_to<std::array<std::byte, Encoder::BUFFER_SIZE>>;
 };
 
 template<BinaryEncoder Encoder>

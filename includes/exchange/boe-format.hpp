@@ -8,6 +8,8 @@
 namespace exchange{
 class BinaryOrderExchangeFormat {
 public:
+	static constexpr size_t BUFFER_SIZE = sizeof(MarketEvent);
+
 	BinaryOrderExchangeFormat() = delete;
 	BinaryOrderExchangeFormat(const BinaryOrderExchangeFormat&) = delete;
 	BinaryOrderExchangeFormat& operator=(const BinaryOrderExchangeFormat&) = delete;

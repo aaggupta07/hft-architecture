@@ -1,12 +1,44 @@
 #include "order-generator.hpp"
 #include <cassert>
+#include <print>
 
 namespace exchange{
+std::random_device MarketRequestGenerator::rd;
+std::mt19937_64 MarketRequestGenerator::generator(MarketRequestGenerator::rd());
+
+void MarketRequestGenerator::log_error(const Error& error) {
+	std::println("[Market Request Generator] Error: {}", error);
+}
+
+void MarketRequestGenerator::log(const OrderRequest& request) {
+	std::string order_type;
+	switch(request.type) {
+		case OrderRequest::Type::Buy:
+			order_type = "Buy";
+			break;
+		case OrderRequest::Type::Sell:
+			order_type = "Sell";
+			break;
+		case OrderRequest::Type::Cancel:
+			order_type = "Cancel";
+			break;
+	}
+
+	std::println(
+		"New Order Request Generated:\n"
+		"\tOrder Type: {}\n"
+		"\tOrder ID: {}\n"
+		"\tOrder Price: {}\n"
+		"\tOrder Quantity: {}\n",
+		order_type, request.order_id, request.price, request.quantity
+	);
+}
+
 Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, bool aggressive) {
 	assert(type == OrderRequest::Type::Buy || type == OrderRequest::Type::Sell);
 	BookState::OrderSnapshot snapshot = clob_.snapshot();
-	const Order::Price best_bid = snapshot.best_bid.price == Order::INVALID_ORDER_ID ? config::DEFAULT_BUY_PRICE : snapshot.best_bid.price;
-	const Order::Price best_ask = snapshot.best_offer.price == Order::INVALID_ORDER_ID ? config::DEFAULT_SELL_PRICE : snapshot.best_offer.price;
+	const Order::Price best_bid = snapshot.best_bid.price == BookState::NO_BID ? config::DEFAULT_BUY_PRICE : snapshot.best_bid.price;
+	const Order::Price best_ask = snapshot.best_offer.price == BookState::NO_OFFER ? config::DEFAULT_SELL_PRICE : snapshot.best_offer.price;
 
 	const Order::Price price_variance = aggressive ? config::LARGE_PRICE_VARIANCE : config::PRICE_VARIANCE;
 
@@ -36,20 +68,31 @@ Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, boo
 	return price_distribution(generator);
 }
 
-std::optional<OrderRequest> MarketRequestGenerator::generate_cancel_request() {
+void MarketRequestGenerator::generate_and_post_cancel_request() {
 	OrderRequest request {
 		.type = OrderRequest::Type::Cancel,
 	};
 	
 
+
 	while(true) {
-		auto result = active_order_ids.remove_random(generator);
-		if(!result) return std::nullopt;
+		if(active_order_ids.is_empty()) {
+			populate_active_orders();
+		}
+
+		request.order_id = active_order_ids.remove_random(generator).value();
 
 		// Lazily removes orders that may have been traded against
-		if(clob_.order_exists(*result)) {
-			request.order_id = *result;
-			return request;
+		if(clob_.order_exists(request.order_id)) {
+			auto result = clob_.submit(request);
+			if(!result && config::LOGGING) [[unlikely]] {
+				log_error(result.error());
+			}
+
+			if constexpr(config::LOGGING) {
+				log(request);
+			}
+			
 		}
 	};
 }
@@ -75,9 +118,13 @@ OrderRequest MarketRequestGenerator::generate_passive_order_request(OrderRequest
 	return request;
 }
 
-std::optional<OrderRequest> MarketRequestGenerator::generate_new_order_request(OrderRequest::Type type) {
+void MarketRequestGenerator::generate_and_post_new_order_request(OrderRequest::Type type) {
 	assert(type == OrderRequest::Type::Buy || type == OrderRequest::Type::Sell);
 	
+	if(active_order_ids.is_full()) {
+		purge_active_orders();
+	}
+
 	double random_value = order_type_distribution(generator);
 	OrderRequest new_request;
 	if(random_value < config::AGGRESSIVE_ORDER_PROBABILITY) {
@@ -86,62 +133,45 @@ std::optional<OrderRequest> MarketRequestGenerator::generate_new_order_request(O
 	else [[likely]] {
 		new_request = generate_passive_order_request(type);
 	}
-	
-	bool added = active_order_ids.add(new_request.order_id);
-	if(!added) return std::nullopt;
 
-	return new_request;
+	auto result = clob_.submit(new_request);
+	if(!result && config::LOGGING) [[unlikely]] {
+		log_error(result.error());
+		return;
+	}
+
+	active_order_ids.add(*result);
+	if constexpr(config::LOGGING) {
+		log(new_request);
+	}
 }
 
 void MarketRequestGenerator::populate_active_orders() {
 	while(active_order_ids.size() < config::POPULATE_WHEN_EMPTY) {
 		double random_value = order_type_distribution(generator);
 		OrderRequest::Type type = random_value < (NORMALIZED_BUY_SELL_PROBABILITY) ? OrderRequest::Type::Buy : OrderRequest::Type::Sell;
-		auto result = generate_new_order_request(type);
-		if(!result) [[unlikely]] break; // Active order list is full
-
-		std::ignore = clob_.submit(*result);
+		generate_and_post_new_order_request(type);
 	}
 }
 
 void MarketRequestGenerator::purge_active_orders() {
 	while(active_order_ids.size() > config::PURGE_UNTIL_WHEN_FULL) {
-		auto result = generate_cancel_request();
-		if(!result) break; // No more active orders to cancel
-
-		if(clob_.order_exists(result->order_id)) {
-			std::ignore = clob_.submit(*result);
-		}
+		generate_and_post_cancel_request();
 	}
 }
 
 void MarketRequestGenerator::generate_and_post_random_order_request() {
 	double random_value = order_type_distribution(generator);
 
-	std::optional<OrderRequest> request;
 	if(random_value < config::CANCEL_PROBABILITY) {
-		request = generate_cancel_request();
-		if(!request) [[unlikely]]{
-			populate_active_orders();
-			return;
-		}
+		generate_and_post_cancel_request();
 	}
 	else if(random_value < config::CANCEL_PROBABILITY + config::BUY_PROBABILITY) {
-		request = generate_new_order_request(OrderRequest::Type::Buy);
-		if(!request) [[unlikely]] {
-			purge_active_orders();
-			return;
-		}
+		generate_and_post_new_order_request(OrderRequest::Type::Buy);
 	}
 	else {
-		request = generate_new_order_request(OrderRequest::Type::Sell);
-		if(!request) [[unlikely]] {
-			purge_active_orders();
-			return;
-		}
+		generate_and_post_new_order_request(OrderRequest::Type::Sell);
 	}
-	
-	std::ignore = clob_.submit(*request);
 }
 
 void MarketRequestGenerator::start() {

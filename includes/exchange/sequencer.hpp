@@ -7,24 +7,22 @@
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <print>
 
 namespace exchange {
 template<BinaryEncoder Encoder>
 class Sequencer {
 private:
     SequenceID sequencer_counter_ = 1;
-    Encoder encoder_;
 
 public:
-    Sequencer(Encoder encoder)
-        : encoder_(encoder) {}
-    
+    Sequencer() = default;
     EncodedMessage generate_message(const MarketEvent& event);
 };
 
 template<BinaryEncoder Encoder>
 EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
-    auto payload = encoder_.encode(event);
+    std::array<std::byte, Encoder::BUFFER_SIZE> payload = Encoder::encode(event);
     
     MessageHeader header {
         .sequence_number = sequencer_counter_++,
@@ -33,6 +31,10 @@ EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
 
     auto message =  EncodedMessage(header, payload);
 	message.serialize();
+
+	if constexpr(config::LOGGING) {
+		std::println("[Sequencer] Sequenced Packet # {}", sequencer_counter_ - 1);
+	}
 	return message;
 }
 }

@@ -17,6 +17,7 @@ private:
 	std::array<std::byte, MAX_WIRE_SIZE> buffer_;
 	
 public:
+	EncodedMessage() = default;
     EncodedMessage(MessageHeader header, std::span<std::byte> payload)
         : header_(header)
     { 

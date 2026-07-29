@@ -46,13 +46,14 @@ public:
 
 		other.close();
 	}
+
 	Connection(Connection&& other) noexcept {
-		steal(other);
+		steal(std::move(other));
 	}
 	Connection& operator=(Connection&& other) noexcept {
 		if(this != &other) {
 			close();
-			steal(other);
+			steal(std::move(other));
 		}
 		return *this;
 	}
@@ -94,8 +95,8 @@ public:
 		connection_status_ = Status::PartialSend;
 
 		int bytes_sent = 0;
-		for(size_t total_bytes = tail_; total_bytes < head_; total_bytes += bytes_sent) {
-			bytes_sent = send(socket_fd_, buffer_.data() + tail_, head_ - bytes_sent, 0);
+		for(; tail_ < head_; tail_ += bytes_sent) {
+			bytes_sent = ::send(socket_fd_, buffer_.data() + tail_, head_ - tail_, 0);
 			if(bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 				return std::unexpected(Error::WouldBlock);
 			}
@@ -105,23 +106,26 @@ public:
 			else if(bytes_sent == -1) {
 				return std::unexpected(Error::SendToClient);
 			}
-			tail_ += bytes_sent;
 		}
 
 		clear();
 		return {};
 	}
 
+	// Ignores `bytes` if a message was partially received - in this case, receive() 
+	// will attempt to fetch the remainder of the partially received message instead.
 	std::expected<std::array<std::byte, N>, Error> receive(size_t bytes) {
 		assert(socket_fd_ >= 0);
-		assert(head_ + bytes < buffer_.size());
-		assert(connection_status_ == Status::Clear || connection_status_ == Status::PartialReceive);
+		assert((connection_status_ == Status::Clear && bytes < buffer_.size()) || connection_status_ == Status::PartialReceive);
 
-		connection_status_ = Status::PartialReceive;
+		if(connection_status_ == Status::Clear) {
+			head_ = bytes;
+			connection_status_ = Status::PartialReceive;
+		} 
 
 		int bytes_received = 0;
-		for(size_t total_bytes = 0; total_bytes < bytes; total_bytes += bytes_received) {
-			bytes_received = recv(socket_fd_, buffer_.data() + head_, bytes - total_bytes, 0);
+		for(; tail_ < head_; tail_ += bytes_received) {
+			bytes_received = recv(socket_fd_, buffer_.data() + tail_, head_ - tail_, 0);
 			if(bytes_received == 0) {
 				return std::unexpected(Error::ClientConnectionClosed);
 			}
@@ -131,7 +135,6 @@ public:
 			else if(bytes_received == -1) {
 				return std::unexpected(Error::ReceiveFromClient);
 			}
-			head_ += bytes_received;
 		}
 
 		clear();

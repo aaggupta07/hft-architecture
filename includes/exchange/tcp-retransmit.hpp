@@ -40,7 +40,7 @@ private:
 
 	SocketFD 	socket_fd_ 			= INVALID;
 	EventQueue 	event_queue_		= INVALID;
-	size_t 		current_connections = 0;
+	size_t 		current_connections_ = 0;
 
 	Cache& retransmit_cache_;
 	std::vector<SavedConnection> connection_buffers;
