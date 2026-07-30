@@ -27,6 +27,8 @@ bool set_multicast_interface(SocketFD socket_fd, const in_addr& interface) noexc
 bool enable_udp_port_sharing(SocketFD socket_fd) noexcept;
 Status join_multicast_group(SocketFD socket_fd, const char* mcast_group) noexcept;
 
+bool resize_recv_buffer(SocketFD socket_fd, size_t new_size_in_bytes);
+
 // SO_NOSIGPIPE reports a broken peer as an error instead of raising SIGPIPE.
 inline bool suppress_sigpipe(SocketFD socket_fd) noexcept {
 	#if defined(SO_NOSIGPIPE)

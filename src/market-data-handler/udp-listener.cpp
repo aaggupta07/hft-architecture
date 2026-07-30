@@ -10,7 +10,9 @@ std::expected<void, Error> RealTimeListener::initialize() {
 	socket_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
 	if(socket_fd_ == INVALID) return std::unexpected(Error::StartUDPListener);
 
-	if(!network::enable_udp_port_sharing(socket_fd_)) {
+	if(	!network::enable_udp_port_sharing(socket_fd_) || 
+		!network::resize_recv_buffer(socket_fd_, config::LISTENER_SOCKET_BUFFER_SIZE)) 
+	{
 		return std::unexpected(Error::StartUDPListener);
 	}
 
@@ -55,7 +57,7 @@ std::expected<void, Error> RealTimeListener::start(std::stop_token stop_token) {
 		auto result = initialize();
 		if(!result) return std::unexpected(result.error());
 	}
-	
+
 	return run(stop_token);
 }
 

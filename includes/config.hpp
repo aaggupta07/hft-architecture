@@ -106,6 +106,8 @@ namespace handler::config {
 	inline constexpr size_t MARKET_EVENT_BUFFER_SIZE = 1 << 13;
 	inline constexpr size_t RETRANSMIT_BUFFER_SIZE = 1 << 8;
 
+	// Real-Time Feed Listener
+	inline constexpr size_t LISTENER_SOCKET_BUFFER_SIZE = 8 * 1024 * 1024; // 8MB
 }
 
 

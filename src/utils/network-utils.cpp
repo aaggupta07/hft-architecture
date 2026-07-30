@@ -71,7 +71,11 @@ Status join_multicast_group(SocketFD socket_fd, const char* mcast_group) noexcep
 	if(status == 0) [[unlikely]] return Status::InvalidIPAddress;
 	else if(status == -1) [[unlikely]] return Status::ProcedureError;
 	mreq.imr_interface.s_addr = INADDR_ANY;
-	return setsockopt(socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1 
+	return setsockopt(socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == INVALID 
 				? Status::ProcedureError : Status::Good;
+}
+
+bool resize_recv_buffer(SocketFD socket_fd, size_t new_size_in_bytes) {
+	return setsockopt(socket_fd, SOL_SOCKET, SO_RCVBUF, &new_size_in_bytes, sizeof(new_size_in_bytes)) == INVALID;
 }
 }
