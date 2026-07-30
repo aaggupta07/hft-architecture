@@ -1,0 +1,7 @@
+#ifndef MARKET_DATA_HANDLER_HPP
+#define MARKET_DATA_HANDLER_HPP
+
+
+
+
+#endif
