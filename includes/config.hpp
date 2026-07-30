@@ -25,6 +25,9 @@ namespace config {
 }
 
 namespace exchange::config {
+	// Logging across the exchange
+	inline constexpr bool LOGGING = true;
+
 	// Broadcast Configuration
 	using Port = uint16_t;
 	inline constexpr char	MCAST_GROUP[]	= "239.255.0.1";
@@ -46,7 +49,6 @@ namespace exchange::config {
 	inline constexpr size_t 		RETRANSMIT_CACHE_SIZE 		= 1 << 10;
 	inline constexpr const char* 	RETRANSMIT_PORT 			= "40000";
 	inline constexpr int 			MAX_PENDING_CONNECTIONS 	= 10;
-	inline constexpr bool 			LOGGING						= true;
 	inline constexpr size_t 		DEFAULT_CONNECTION_BUFFERS 	= 5;
 	inline constexpr size_t 		MAX_TOTAL_CONNECTIONS 		= 25;
 	// kqueue timeout: Sleeps for up to this much time before checking for a shutdown request
@@ -95,8 +97,10 @@ namespace exchange::config {
 }
 
 namespace data::config {
+	// Logging across the market data handler
+	inline constexpr bool LOGGING = true;
 
-
+	
 
 
 
