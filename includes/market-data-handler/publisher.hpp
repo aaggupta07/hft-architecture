@@ -8,7 +8,7 @@
 
 #include <stop_token>
 
-namespace data {
+namespace handler {
 template<BinaryDecoder Decoder>
 class MarketEventPublisher {
 private:

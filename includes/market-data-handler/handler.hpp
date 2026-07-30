@@ -9,7 +9,7 @@
 #include "order.hpp"
 #include "binary-protocol.hpp"
 
-namespace data {
+namespace handler {
 using SequenceID = uint64_t;
 using SerializedMarketEvent = std::array<std::byte, exchange::BinaryProtocol::BUFFER_SIZE>;
 

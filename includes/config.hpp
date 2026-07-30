@@ -96,7 +96,7 @@ namespace exchange::config {
 	inline constexpr size_t POPULATE_WHEN_EMPTY = 1 << 8; 
 }
 
-namespace data::config {
+namespace handler::config {
 	// Logging across the market data handler
 	inline constexpr bool LOGGING = true;
 

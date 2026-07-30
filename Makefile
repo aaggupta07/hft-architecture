@@ -5,13 +5,18 @@ CPPFLAGS := $(addprefix -I,$(INCLUDE_DIRS)) -MMD -MP
 CXXFLAGS := -std=c++23 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined -g
 RELEASE_FLAGS := -O3 -flto -DNDEBUG -march=native -fomit-frame-pointer
 
-SOURCE_DIRS := src src/order-book src/exchange src/utils src/market-data-handler
-SOURCES := $(foreach dir,$(SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
-EXCHANGE_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(SOURCES))
+COMMON_SOURCE_DIRS := src/order-book src/utils
+EXCHANGE_SOURCE_DIRS := $(COMMON_SOURCE_DIRS) src/exchange
+MARKET_HANDLER_SOURCE_DIRS := $(COMMON_SOURCE_DIRS) src/market-data-handler
+
+EXCHANGE_SOURCES := $(foreach dir,$(EXCHANGE_SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
+MARKET_HANDLER_SOURCES := $(foreach dir,$(MARKET_HANDLER_SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
+EXCHANGE_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(EXCHANGE_SOURCES))
+MARKET_HANDLER_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(MARKET_HANDLER_SOURCES))
 
 TEST_SOURCES := test/order-book-tester.cpp test/exchange-tester.cpp test/exchange-pipeline-tester.cpp
 TEST_OBJECTS := $(patsubst test/%.cpp,obj/test/%.o,$(TEST_SOURCES))
-OBJECTS := $(EXCHANGE_OBJECTS) $(TEST_OBJECTS)
+OBJECTS := $(EXCHANGE_OBJECTS) $(MARKET_HANDLER_OBJECTS) $(TEST_OBJECTS)
 DEPENDENCIES := $(OBJECTS:.o=.d)
 
 .PHONY: all clean test
@@ -31,6 +36,10 @@ bin/order-book: obj/test/order-book-tester.o obj/order-book/book-state.o obj/ord
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 bin/exchange: obj/test/exchange-tester.o $(EXCHANGE_OBJECTS)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+bin/market-handler: $(MARKET_HANDLER_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 

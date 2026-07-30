@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace data {
+namespace handler {
 class GapDetector {
 private:
 	SequenceID most_recent_packet_id;

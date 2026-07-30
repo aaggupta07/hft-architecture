@@ -1,13 +1,11 @@
 #include "broadcaster.hpp"
 #include "config.hpp"
 #include "encoded-message.hpp"
+#include "network-utils.hpp"
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <ifaddrs.h>
 #include <netinet/in.h>
-#include <net/if.h>
-#include <fcntl.h>
 #include <cerrno>
 #include <cassert>
 #include <cstdio>
@@ -18,82 +16,26 @@ auto Broadcaster::start() -> std::expected<void, Error> {
     socket_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if(socket_fd_ == INVALID) return std::unexpected(Error::StartBroadcast);
 
-    const int flags = fcntl(socket_fd_, F_GETFL, 0);
-    if(flags == INVALID || fcntl(socket_fd_, F_SETFL, flags | O_NONBLOCK) == INVALID) {
-        return std::unexpected(Error::StartBroadcast);
-    }
-
-	// Suppress SIGPIPE on macOS/BSD and relay an error instead
-	#if defined(SO_NOSIGPIPE)
-		constexpr int NO_SIGPIPE = 1;
-		if(setsockopt(socket_fd_, SOL_SOCKET, SO_NOSIGPIPE, &NO_SIGPIPE, sizeof(NO_SIGPIPE)) == INVALID) {
-			return std::unexpected(Error::StartBroadcast);
-		}
-	#endif
-
-    // Messages won't leave the local subnet
-    constexpr uint8_t TTL = 1; 
-	int status = setsockopt(socket_fd_, IPPROTO_IP, IP_MULTICAST_TTL, &TTL, sizeof(TTL));
-    if(status == INVALID) {
-        return std::unexpected(Error::StartBroadcast);
-    }
-	// Allow loopback to local device
-    constexpr uint8_t LOOP = true;
-	status = setsockopt(socket_fd_, IPPROTO_IP, IP_MULTICAST_LOOP, &LOOP, sizeof(LOOP));
-    if(status == INVALID) {
-        return std::unexpected(Error::StartBroadcast);
-    }
-
-	destination_ = {};
-    destination_.sin_family	= AF_INET;
-	destination_.sin_port	= htons(config::MCAST_PORT);
-	status = inet_pton(AF_INET, config::MCAST_GROUP, &destination_.sin_addr);
-	if(status == 0) {
-		return std::unexpected(Error::InvalidBroadcastIP);
-	}
-	if(status == INVALID) {
+    if(	!network::set_socket_nonblocking(socket_fd_) ||
+		!network::suppress_sigpipe(socket_fd_) ||
+		!network::limit_multicast_to_local_subnet(socket_fd_) ||
+		!network::enable_multicast_loopback(socket_fd_)) 
+	{
 		return std::unexpected(Error::StartBroadcast);
 	}
+
+    destination_.sin_family	= AF_INET;
+	destination_.sin_port	= htons(config::MCAST_PORT);
+	int status = inet_pton(AF_INET, config::MCAST_GROUP, &destination_.sin_addr);
+	if(status == 0) return std::unexpected(Error::InvalidBroadcastIP);
+	if(status == INVALID) return std::unexpected(Error::StartBroadcast);
 
 	in_addr multicast_interface {};
 	if(inet_pton(AF_INET, config::MCAST_INTERFACE, &multicast_interface) != 1) {
 		return std::unexpected(Error::StartBroadcast);
 	}
 
-	
-	if(multicast_interface.s_addr != htonl(INADDR_ANY)) {
-		ifaddrs* addresses = nullptr;
-		if(getifaddrs(&addresses) == INVALID) {
-			return std::unexpected(Error::StartBroadcast);
-		}
-
-		unsigned int interface_index = 0;
-		for(const ifaddrs* address = addresses; address != nullptr; address = address->ifa_next) {
-			if(address->ifa_addr == nullptr || address->ifa_addr->sa_family != AF_INET) {
-				continue;
-			}
-
-			const auto* ipv4_address = reinterpret_cast<const sockaddr_in*>(address->ifa_addr);
-			if(ipv4_address->sin_addr.s_addr == multicast_interface.s_addr) {
-				interface_index = if_nametoindex(address->ifa_name);
-				break;
-			}
-		}
-		freeifaddrs(addresses);
-
-		if(interface_index == 0) {
-			return std::unexpected(Error::InvalidBroadcastInterface);
-		}
-
-		#if defined(IP_BOUND_IF)
-			if(setsockopt(socket_fd_, IPPROTO_IP, IP_BOUND_IF, &interface_index, sizeof(interface_index)) == INVALID) {
-				return std::unexpected(Error::StartBroadcast);
-			}
-		#endif
-	}
-
-	status = setsockopt(socket_fd_, IPPROTO_IP, IP_MULTICAST_IF, &multicast_interface, sizeof(multicast_interface));
-	if(status == INVALID) {
+	if(!network::set_multicast_interface(socket_fd_, multicast_interface)) {
 		return std::unexpected(Error::StartBroadcast);
 	}
 

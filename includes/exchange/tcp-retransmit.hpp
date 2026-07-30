@@ -46,11 +46,6 @@ private:
 	Cache& retransmit_cache_;
 	std::vector<SavedConnection> connection_buffers;
 
-	static 	std::expected<void, Error> 		set_socket_nonblocking	(int socket_fd);
-	static 	std::expected<void, Error> 		register_read_event		(int kq, int socket_fd);
-	static 	std::expected<void, Error> 		register_write_event	(int kq, int socket_fd);
-	static 	void					 		unregister				(int kq, int socket_fd) noexcept;
-
 	static 	std::expected<SocketFD, Error> 	get_listener			();
 
 			std::expected<SocketFD, Error> 	get_connected_socket	();

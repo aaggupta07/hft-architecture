@@ -1,6 +1,7 @@
 #include "tcp-retransmit.hpp"
 #include "tcp-connection.hpp"
 #include "encoded-message.hpp"
+#include "network-utils.hpp"
 
 #include <array>
 
@@ -45,41 +46,6 @@ constexpr void RetransmitServer::log(const Error& error) const {
 	std::fflush(stdout);
 }
 
-std::expected<void, Error> RetransmitServer::set_socket_nonblocking(int socket_fd) {
-	int flags = fcntl(socket_fd, F_GETFL, 0);
-	if(flags == INVALID) [[unlikely]] {
-		return std::unexpected(Error::SetSocketNonblocking);
-	}
-	if(fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) == INVALID) [[unlikely]] {
-		return std::unexpected(Error::SetSocketNonblocking);
-	}
-	return {};
-}
-
-std::expected<void, Error> RetransmitServer::register_read_event(int kq, int socket_fd) {
-	struct kevent event;
-	EV_SET(&event, socket_fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-	if(kevent(kq, &event, 1, nullptr, 0, nullptr) == INVALID) [[unlikely]] {
-		return std::unexpected(Error::RegisterEvent);
-	}
-	return {};
-}
-
-std::expected<void, Error> RetransmitServer::register_write_event(int kq, int socket_fd) {
-	struct kevent event;
-	EV_SET(&event, socket_fd, EVFILT_WRITE, EV_ADD | EV_ENABLE | EV_ONESHOT, 0, 0, nullptr);
-	if(kevent(kq, &event, 1, nullptr, 0, nullptr) == INVALID) [[unlikely]] {
-		return std::unexpected(Error::RegisterEvent);
-	}
-	return {};
-}
-
-void RetransmitServer::unregister(int kq, int socket_fd) noexcept {
-	struct kevent event;
-	EV_SET(&event, socket_fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
-	kevent(kq, &event, 1, nullptr, 0, nullptr); // best effort
-}
-
 auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 	addrinfo hints {};
 	addrinfo* server_info = nullptr;
@@ -98,11 +64,10 @@ auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 		return std::unexpected(Error::StartRetransmitServer);
 	}
 
-	auto result = set_socket_nonblocking(new_socket);
-	if(!result) [[unlikely]] {
+	if(!network::set_socket_nonblocking(new_socket)) [[unlikely]] {
 		close(new_socket);
 		freeaddrinfo(server_info);
-		return std::unexpected(result.error());
+		return std::unexpected(Error::SetSocketNonblocking);
 	}
 
 	status = bind(new_socket, server_info->ai_addr, server_info->ai_addrlen);
@@ -129,7 +94,7 @@ void RetransmitServer::notify_and_close(SavedConnection& client, const Error& er
 }
 
 void RetransmitServer::close_client(SavedConnection& client) noexcept {
-	if(event_queue_ >= 0) unregister(event_queue_, client.connection.socket());
+	if(event_queue_ >= 0) network::unregister_read_event(event_queue_, client.connection.socket());
 	client.connection.close();
 	client.request = std::nullopt;
 	--current_connections_;
@@ -152,7 +117,8 @@ auto RetransmitServer::initialize() -> std::expected<void, Error> {
 		return std::unexpected(Error::EventQueue);
 	} 
 
-	return register_read_event(event_queue_, socket_fd_);
+	if(!network::register_read_event(event_queue_, socket_fd_)) [[unlikely]] return std::unexpected(Error::RegisterEvent);
+	return {};
 }
 
 void RetransmitServer::close_server() noexcept {
@@ -188,14 +154,12 @@ auto RetransmitServer::get_connected_socket() -> std::expected<SocketFD, Error> 
 	}
 
 
-	auto result = set_socket_nonblocking(connected_socket);
-	if(!result) {
+	if(!network::set_socket_nonblocking(connected_socket)) {
 		close(connected_socket);
 		return std::unexpected(Error::SetSocketNonblocking);
 	}
 
-	result = register_read_event(event_queue_, connected_socket);
-	if(!result) {
+	if(!network::register_read_event(event_queue_, connected_socket)) {
 		close(connected_socket);
 		return std::unexpected(Error::RegisterEvent);
 	}
@@ -387,10 +351,9 @@ auto RetransmitServer::handle_request(SocketFD connected_socket) -> std::expecte
 					switch(result.error()) {
 						case Error::WouldBlock:
 							{
-								auto event_result = register_write_event(event_queue_, connected_socket);
-								if(!event_result) {
+								if(!network::register_oneshot_write_event(event_queue_, connected_socket)) {
 									notify_and_close(client, Error::ClientConnection);
-									return std::unexpected(event_result.error());
+									return std::unexpected(Error::RegisterEvent);
 								}
 								return {};
 							}

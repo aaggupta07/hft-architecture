@@ -136,7 +136,8 @@ struct std::formatter<exchange::Error> : std::formatter<std::string_view> {
 			case ServerFatal:
 				{
 					const int error_number = errno;
-					return std::format_to(context.out(), "{} (errno {}: {})", name, error_number, std::strerror(error_number));
+					return std::format_to(context.out(), "{} (errno {}: {})", name,
+											error_number, std::strerror(error_number));
 				}
 			default:
 				return std::formatter<std::string_view>::format(name, context);

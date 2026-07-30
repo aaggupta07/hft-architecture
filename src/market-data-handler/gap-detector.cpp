@@ -1,6 +1,6 @@
 #include "gap-detector.hpp"
 
-namespace data {
+namespace handler {
 std::optional<exchange::RetransmitRequest> GapDetector::has_gap(const exchange::MessageHeader& new_packet_header) {
 	SequenceID new_sequence_id = new_packet_header.sequence_number;
 	if(new_sequence_id > most_recent_packet_id + 1) {
