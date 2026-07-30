@@ -40,6 +40,13 @@ public:
 	}
 
     const std::span<const std::byte> serialize();
+
+	// Designed for another function (e.g. receivefrom()) to directly fill the buffer
+	constexpr std::array<std::byte, MAX_WIRE_SIZE>& get_buffer_ref() noexcept {
+		return buffer_;
+	}
+
+	void decode_from_header() noexcept;
 };
 
 #endif

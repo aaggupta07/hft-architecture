@@ -4,7 +4,7 @@ A complete low-latency algorithmic trading pipeline, consisting of an exchange s
 ## Exchange Simulator
 The exchange simulator generates and publishes market events over UDP multicast, running on three separate threads:
 1. A configurable __synthetic order generator__ publishes order requests to the exchange's __matching engine__, which publishes the corresponding market events to a __lock-free SPSC ring buffer__.
-2. The exchange simulator's __orchestrator__ reads these market events, passes them to a __sequencer__ which encodes the messages into a custom __BOE format__, stamps a sequencer number and header, and serializes the entire message. The orchestrator caches this encoded message on a thread-safe circular cache, and forwards it to the __UDP broadcaster__ to send over UDP multicast.
+2. The exchange simulator's __orchestrator__ reads these market events, passes them to a __sequencer__ which encodes the messages into a custom __binary protocol__, stamps a sequencer number and header, and serializes the entire message. The orchestrator caches this encoded message on a thread-safe circular cache, and forwards it to the __UDP broadcaster__ to send over UDP multicast.
 3. The asynchronous, I/O-multiplexed __TCP retransmit server__ handles client connections, retreives and corresponding cached packets, and transmits them over the TCP connection.
 
 ![Exchange Diagram](diagrams/exchange-simulator.png)
@@ -22,5 +22,3 @@ A Makefile has been provided for convenience:
 2. Edit `includes/config.hpp` as desired. By default, `LOGGING` is enabled. You may need to edit the UDP MCAST interface or other network details.
 3. Run `make bin/exchange` run `./bin/exchange`
 4. Press `CTRL + C` to stop.
-
-

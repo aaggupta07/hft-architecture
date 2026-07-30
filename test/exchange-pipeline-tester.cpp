@@ -1,8 +1,8 @@
-#include "boe-format.hpp"
+#include "binary-protocol.hpp"
 #include "circular-cache.hpp"
 #include "clob.hpp"
 #include "encoded-message.hpp"
-#include "ring-buffer.hpp"
+#include "lazy-ring-buffer.hpp"
 #include "sequencer.hpp"
 
 #include <cassert>
@@ -10,7 +10,7 @@
 #include <print>
 
 namespace {
-using Buffer = SharedRingBuffer<MarketEvent, exchange::config::MARKET_EVENT_BUFFER_CAPACITY>;
+using Buffer = LazyRingBuffer<MarketEvent, exchange::config::MARKET_EVENT_BUFFER_CAPACITY>;
 using Cache = CircularCache<exchange::EncodedMessage, exchange::config::RETRANSMIT_CACHE_SIZE>;
 
 bool same_event(const MarketEvent& left, const MarketEvent& right) {
@@ -24,21 +24,22 @@ bool same_event(const MarketEvent& left, const MarketEvent& right) {
 void verify_events(
 	Buffer& buffer,
 	Cache& cache,
-	exchange::Sequencer<exchange::BinaryOrderExchangeFormat>& sequencer,
+	exchange::Sequencer<exchange::BinaryProtocol>& sequencer,
 	exchange::SequenceID& next_sequence)
 {
-	while(auto event = buffer.try_pop()) {
+	while(auto event = buffer.try_get_tail_ref()) {
 		auto message = sequencer.generate_message(*event);
 		assert(message.header().sequence_number == next_sequence);
-		assert(exchange::BinaryOrderExchangeFormat::decode(message.payload()).order.order_id == event->order.order_id);
-		assert(same_event(exchange::BinaryOrderExchangeFormat::decode(message.payload()), *event));
+		assert(exchange::BinaryProtocol::decode(message.payload()).order.order_id == event->order.order_id);
+		assert(same_event(exchange::BinaryProtocol::decode(message.payload()), *event));
 
 		cache.put_item(message);
 		auto cached = cache.try_get_item(static_cast<uint32_t>(next_sequence - 1));
 		assert(cached);
 		assert(cached->header().sequence_number == next_sequence);
-		assert(same_event(exchange::BinaryOrderExchangeFormat::decode(cached->payload()), *event));
+		assert(same_event(exchange::BinaryProtocol::decode(cached->payload()), *event));
 		++next_sequence;
+		buffer.consume();
 	}
 }
 }
@@ -47,7 +48,7 @@ int main() {
 	Buffer buffer;
 	Cache cache;
 	exchange::CentralLimitOrderBook clob(buffer);
-	exchange::Sequencer<exchange::BinaryOrderExchangeFormat> sequencer;
+	exchange::Sequencer<exchange::BinaryProtocol> sequencer;
 	exchange::SequenceID next_sequence = 1;
 
 	const auto buy_id = clob.submit({.price = 100, .quantity = 100, .type = exchange::OrderRequest::Type::Buy});

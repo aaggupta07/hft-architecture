@@ -45,7 +45,7 @@ void ExchangeSimulator::run(std::stop_token stop_token) {
 	}
 
 	while(!stop_token.stop_requested()) {
-		auto new_market_event = market_event_buffer_.wait_pop(stop_token);
+		MarketEvent* new_market_event = market_event_buffer_.wait_get_tail_ref(stop_token);
 		if(!new_market_event) {
 			if constexpr(config::LOGGING) {
 				log("Stopped while waiting for a market event.");
@@ -53,6 +53,8 @@ void ExchangeSimulator::run(std::stop_token stop_token) {
 			break;
 		}
 		const EncodedMessage new_message = sequencer_.generate_message(*new_market_event);
+		market_event_buffer_.consume();
+
 		retransmit_cache_.put_item(new_message);
 		if constexpr(config::LOGGING) {
 			std::println("[ExchangeSimulator] Cached packet # {}.", new_message.header().sequence_number);

@@ -36,7 +36,7 @@ namespace exchange::config {
 	// Central Limit Order Book Configuration
 	inline constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 10;
 
-	// Encoded Message Configuration
+	// Encoded Message Configuration (note: a `MarketEvent` is 18 bytes large when serialized)
 	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 5;
 
 	// Sequencer Configuration (None)
@@ -93,7 +93,13 @@ namespace exchange::config {
 	inline constexpr size_t POPULATE_WHEN_EMPTY = 1 << 8; 
 }
 
+namespace data::config {
 
+
+
+
+
+}
 
 
 #endif

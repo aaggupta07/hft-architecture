@@ -43,8 +43,7 @@ private:
         std::byte storage[sizeof(T)];
     };
 
-    // Keep the ownership indices on distinct cache lines.  All remaining
-    // state is position independent, so mappings may have different bases.
+    // Avoid false sharing
     alignas(config::CACHE_LINE_SIZE) std::atomic<size_t> head_{0};
     alignas(config::CACHE_LINE_SIZE) std::atomic<size_t> tail_{0};
     alignas(config::CACHE_LINE_SIZE) std::array<Slot, CAPACITY> buffer_{};
@@ -64,8 +63,7 @@ private:
     /* Apple Silicon optimization only: 
 	 * Uses ARM's event mechanism to reduce power while spinning. 
 	 * SEVL makes the first WFE return immediately. Publishers issue SEV
-	 * after releasing their cursor to wake a thread that is already waiting.
-	*/ 
+	 * after releasing their cursor to wake a thread that is already waiting. */ 
     static inline void wait_for_progress() noexcept {
 		#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
 				asm volatile("sevl\n\twfe" ::: "memory");

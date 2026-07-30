@@ -6,9 +6,9 @@
 
 #include "order-generator.hpp"
 #include "clob.hpp"
-#include "ring-buffer.hpp"
+#include "lazy-ring-buffer.hpp"
 
-#include "boe-format.hpp"
+#include "binary-protocol.hpp"
 #include "sequencer.hpp"
 
 #include "circular-cache.hpp"
@@ -28,13 +28,13 @@ private:
 
 	void run(std::stop_token stop_token);
 
-	using MarketEventBuffer = SharedRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
+	using MarketEventBuffer = LazyRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
 	
 	MarketEventBuffer market_event_buffer_;
 	CentralLimitOrderBook clob_;
 	MarketRequestGenerator order_generator_;
 
-	Sequencer<BinaryOrderExchangeFormat> sequencer_;
+	Sequencer<BinaryProtocol> sequencer_;
 
 	using RetransmitCache = CircularCache<EncodedMessage, config::RETRANSMIT_CACHE_SIZE>;
 	RetransmitCache retransmit_cache_;

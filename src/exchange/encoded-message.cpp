@@ -9,4 +9,9 @@ auto EncodedMessage::serialize() -> const std::span<const std::byte> {
     header_.serialize(buffer_span);
     return message();
 }
+
+void EncodedMessage::decode_from_header() noexcept {
+	std::memcpy(&header_.sequence_number, buffer_.data(), sizeof(SequenceID));
+	std::memcpy(&header_.payload_length, buffer_.data() + sizeof(SequenceID), sizeof(Length));
+}
 }

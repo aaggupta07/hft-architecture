@@ -5,7 +5,7 @@ CPPFLAGS := $(addprefix -I,$(INCLUDE_DIRS)) -MMD -MP
 CXXFLAGS := -std=c++23 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined -g
 RELEASE_FLAGS := -O3 -flto -DNDEBUG -march=native -fomit-frame-pointer
 
-SOURCE_DIRS := src/order-book src/exchange src/utils
+SOURCE_DIRS := src src/order-book src/exchange src/utils
 SOURCES := $(foreach dir,$(SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
 EXCHANGE_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(SOURCES))
 

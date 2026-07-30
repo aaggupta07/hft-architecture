@@ -5,7 +5,7 @@
 #include "exchange-errors.hpp"
 #include "order.hpp"
 #include "book-state.hpp"
-#include "ring-buffer.hpp"
+#include "lazy-ring-buffer.hpp"
 #include "config.hpp"
 
 #include <expected>
@@ -14,7 +14,7 @@
 namespace exchange {
 class CentralLimitOrderBook {
 private:
-	using MarketEventBuffer = SharedRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
+	using MarketEventBuffer = LazyRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_CAPACITY>;
 	
 	Order::ID next_order_id_ = 1;
 	BookState state_;
