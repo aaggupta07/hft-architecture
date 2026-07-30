@@ -1,30 +1,36 @@
 #ifndef REORDER_BUFFER_HPP
 #define REORDER_BUFFER_HPP
 
+#include "config.hpp"
+
 #include <atomic>
 #include <array>
 #include <optional>
+#include <stop_token>
 
 template<typename T, size_t CAPACITY>
 class ReorderBuffer {
 private:
+	static_assert((CAPACITY & (CAPACITY - 1)) == 0 && 
+		"CAPACITY must be a power of 2.");
+
 	enum class Status: uint8_t {
 		Empty,
 		Locked,
 		Ready,
 	};
 
-	static_assert((CAPACITY & (CAPACITY - 1)) == 0 && 
-		"CAPACITY must be a power of 2.");
-
-	struct BufferSlot {
+	// It is likely that the consumer and producer threads read/write close to each other.
+	// Thus, store status within the slot, and align each buffer slot to a separate cache line
+	// to prevent false sharing. This does cost memory, especially for smaller types T.
+	struct alignas(config::CACHE_LINE_SIZE) BufferSlot {
 		T data;
 		std::atomic<Status> status;
 	};
 
 	static constexpr size_t MASK = CAPACITY - 1;
 
-	// This is necessary to prevent an (unlikely) but dangerous silent data race
+	// This is necessary to prevent an (unlikely) but dangerous silent data race - see below
 	static constexpr size_t MAX_INDEX_AHEAD = CAPACITY - 1; 
 
 	std::array<BufferSlot, CAPACITY> buffer_;
@@ -57,6 +63,7 @@ public:
 
 	std::optional<T> 	try_consume_next();
 	T 					wait_consume_next();
+	std::optional<T>	wait_consume_next(std::stop_token stop_token);
 
 	WriteStatus try_write_to(const T& data, size_t index);
 };
@@ -84,7 +91,17 @@ template<typename T, size_t CAPACITY>
 T ReorderBuffer<T, CAPACITY>::wait_consume_next() {
 	while(true) {
 		if(auto result = try_consume_next()) {
-			return std::move(*result);
+			return *result;
+		}
+		wait_for_progress();
+	}
+}
+
+template<typename T, size_t CAPACITY>
+std::optional<T> ReorderBuffer<T, CAPACITY>::wait_consume_next(std::stop_token stop_token) {
+	while(!stop_token.stop_requested()) {
+		if(auto result = try_consume_next()) {
+			return result;
 		}
 		wait_for_progress();
 	}

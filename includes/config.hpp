@@ -100,9 +100,11 @@ namespace data::config {
 	// Logging across the market data handler
 	inline constexpr bool LOGGING = true;
 
-	
-
-
+	// Buffer sizes
+	inline constexpr size_t UDP_PACKET_BUFFER_SIZE = 1 << 12;
+	inline constexpr size_t REORDER_BUFFER_SIZE = 1 << 13;
+	inline constexpr size_t MARKET_EVENT_BUFFER_SIZE = 1 << 13;
+	inline constexpr size_t RETRANSMIT_BUFFER_SIZE = 1 << 8;
 
 }
 

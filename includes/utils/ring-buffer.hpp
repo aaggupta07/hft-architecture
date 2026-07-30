@@ -150,7 +150,7 @@ public:
     T wait_pop() {
         while (true) {
             if (auto value = try_pop()) {
-                return std::move(*value);
+                return *value;
             }
             wait_for_progress();
         }
