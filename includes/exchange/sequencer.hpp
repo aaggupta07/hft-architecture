@@ -4,6 +4,7 @@
 #include "protocol.hpp"
 #include "encoded-message.hpp"
 #include "order.hpp"
+#include "config.hpp"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -14,7 +15,7 @@ namespace exchange {
 template<BinaryEncoder Encoder>
 class Sequencer {
 private:
-    SequenceID sequencer_counter_ = 1;
+    SequenceID sequencer_counter_ = config::FIRST_SEQUENCE_ID;
 
 public:
     Sequencer() = default;

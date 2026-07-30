@@ -307,7 +307,7 @@ auto RetransmitServer::start(std::stop_token stop_token) -> std::expected<void, 
 auto RetransmitServer::stream_packets(SavedConnection& client) -> std::expected<void, Error> {
 	assert(client.request.has_value());
 	assert(client.connection.socket() >= 0);
-	if(client.request->first_packet == 0) {
+	if(client.request->first_packet < config::FIRST_SEQUENCE_ID) {
 		return std::unexpected(Error::InvalidPacket);
 	}
 
@@ -320,8 +320,8 @@ auto RetransmitServer::stream_packets(SavedConnection& client) -> std::expected<
 	}
 
 	for(; client.request->first_packet < client.request->last_packet; ++client.request->first_packet) {
-		// The sequencer begins numbering at 1, so the first packet maps to slot 0 
-		auto cache_result = retransmit_cache_.try_get_item(client.request->first_packet - 1);
+		// The sequencer begins numbering at FIRST_SEQUENCE_ID, so packet FIRST_SEQUENCE_ID maps to slot 0 
+		auto cache_result = retransmit_cache_.try_get_item(client.request->first_packet - config::FIRST_SEQUENCE_ID);
 		if(!cache_result) {
 			switch(cache_result.error()) {
 				case Cache::Error::DataTooOld:

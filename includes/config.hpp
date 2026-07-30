@@ -39,7 +39,8 @@ namespace exchange::config {
 	// Encoded Message Configuration (note: a `MarketEvent` is 18 bytes large when serialized)
 	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 5;
 
-	// Sequencer Configuration (None)
+	// Sequencer Configuration
+	inline constexpr uint64_t FIRST_SEQUENCE_ID = 1;
 
 	// TCP Retransmit Server Configuration
 	inline constexpr size_t 		RETRANSMIT_CACHE_SIZE 		= 1 << 10;
