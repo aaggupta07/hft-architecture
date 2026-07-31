@@ -5,8 +5,19 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <print>
+#include <cstdio>
 
 namespace handler {
+constexpr void RetransmitListener::log(const Error& error) {
+	std::println("[Retransmit Client] Error: {}", error);
+	std::fflush(stdout);
+}
+
+constexpr void RetransmitListener::log(std::string_view message) {
+	std::println("[Retransmit Client] {}", message);
+	std::fflush(stdout);
+}
+
 std::expected<void, Error> RetransmitListener::connect_to_server() {
 	assert(socket_fd_ >= 0);
 
@@ -22,9 +33,10 @@ std::expected<void, Error> RetransmitListener::connect_to_server() {
 		return std::unexpected(Error::StartRetransmitClient);
 	}
 
-	if(connect(socket_fd_, reinterpret_cast<sockaddr*>(&server_info), sizeof(server_info) == INVALID)) {
+	if(connect(socket_fd_, reinterpret_cast<sockaddr*>(&server_info), sizeof(server_info)) == INVALID) {
 		return std::unexpected(Error::ConnectToRetransmitServer);
 	}
+	if constexpr(config::LOGGING) log("Connected to retransmit server.");
 
 	return {};
 }
@@ -45,7 +57,7 @@ std::expected<void, Error> RetransmitListener::send_request_to_server(const exch
 constexpr void RetransmitListener::log_server_error_message(const exchange::MessageHeader& header) {
 	assert(header.sequence_number == 0);
 	auto error = static_cast<exchange::Error>(header.payload_length);
-	std::println("Exchange Retransmit Server Error: {}", error);
+	std::println("[Retransmit Client] Exchange Retransmit Server Error: {}", error);
 }
 
 std::expected<void, Error> RetransmitListener::receive_and_decode_header(exchange::EncodedMessage& new_message) {
@@ -60,7 +72,7 @@ std::expected<void, Error> RetransmitListener::receive_and_decode_header(exchang
 		return std::unexpected(Error::RetransmitServer);
 	}
 
-	new_message.decode_from_header();
+	new_message.decode_header_from_buffer();
 
 	// The server provided an error message
 	if(new_message.header().sequence_number == 0) {
@@ -76,6 +88,7 @@ std::expected<void, Error> RetransmitListener::receive_and_decode_header(exchang
 
 std::expected<void, Error> RetransmitListener::receive_payload(exchange::EncodedMessage& new_message) {
 	assert(new_message.header().payload_length > 0);
+	assert(new_message.header().payload_length <= exchange::config::MAX_MESSAGE_BYTES);
 	network::ReceiveStatus status = network::recv_range(socket_fd_, new_message.get_payload_ref(), 0, new_message.header().payload_length);
 	switch(status) {
 		case network::ReceiveStatus::ConnectionClosed:
@@ -85,11 +98,15 @@ std::expected<void, Error> RetransmitListener::receive_payload(exchange::Encoded
 		case network::ReceiveStatus::Success:
 			return {};
 	}
-	assert(false && "[Retransmit Listener] receive_payload: unreachable");
+	assert(false && "[Retransmit Client] receive_payload: unreachable");
 	std::unreachable();
 }
 
 std::expected<void, Error> RetransmitListener::handle_request(exchange::RetransmitRequest& request, std::stop_token stop_token) {
+	if constexpr(config::LOGGING) {
+		std::println("[Retransmit Client] Requesting packets {} to {}.", request.first_packet, request.last_packet);
+		std::fflush(stdout);
+	}
 	auto result = send_request_to_server(request);
 	if(!result) return result;
 
@@ -103,12 +120,21 @@ std::expected<void, Error> RetransmitListener::handle_request(exchange::Retransm
 		result = receive_payload(new_message);
 		if(!result) return result;
 
+		assert(new_message.get_payload_ref().size() == exchange::BinaryProtocol::BUFFER_SIZE && 
+			"[Retransmit Client] handle_request: received payload size doesn't match BinaryProtocol::BUFFER_SIZE");
+		assert(new_message.header().sequence_number == request.first_packet && 
+			"[Retransmit Client] handle_request: received payload sequence ID doesn't match requested sequence ID");
+
 		result = write_market_data_to_reorder_buffer(
 			reorder_buffer_, 
 			new_message.get_payload_ref(), 
 			new_message.header().sequence_number
 		);
 		if(!result) return result;
+		if constexpr(config::LOGGING) {
+			std::println("[Retransmit Client] Received packet {}.", new_message.header().sequence_number);
+			std::fflush(stdout);
+		}
 	}
 	return {};
 }
@@ -127,7 +153,10 @@ std::expected<void, Error> RetransmitListener::run(std::stop_token stop_token) {
 std::expected<void, Error> RetransmitListener::start(std::stop_token stop_token) {
 	if(socket_fd_ == INVALID) {
 		auto result = initialize_and_connect();
-		if(!result) return result;
+		if(!result) {
+			if constexpr(config::LOGGING) log(result.error());
+			return result;
+		}
 	}
 	return run(stop_token);
 }

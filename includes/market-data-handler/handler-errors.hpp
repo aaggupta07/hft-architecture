@@ -12,6 +12,7 @@ enum class Error {
 	StartUDPListener,
 	InvalidMulticastGroup,
 	UDPListen,
+	HandlerTooSlow,
 
 	// Retransmit Client (TCP)
 	StartRetransmitClient,
@@ -24,6 +25,7 @@ enum class Error {
 	// Market Data Handler
 	ReaderTooFarBehind,
 	WriterTooFarBehind,
+	RetransmitRequestBufferFull,
 };
 }
 
@@ -65,6 +67,12 @@ struct std::formatter<handler::Error> : std::formatter<std::string_view> {
 				break;
 			case WriterTooFarBehind:
 				name = "Fatal: Market data handler too far behind. Likely slow TCP retransmission.";
+				break;
+			case RetransmitRequestBufferFull:
+				name = "Retransmit request buffer full.";
+				break;
+			case HandlerTooSlow:
+				name = "Fatal: Market data handler too slow. Packet buffer is full.";
 				break;
 			default:
 				name = "Unknown Error";

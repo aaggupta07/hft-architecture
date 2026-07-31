@@ -8,6 +8,7 @@
 
 #include <expected>
 #include <stop_token>
+#include <string_view>
 
 namespace handler {
 class RetransmitListener {
@@ -31,6 +32,8 @@ private:
 
 	std::expected<void, Error> run(std::stop_token stop_token);
 
+	static constexpr void log(const Error& error);
+	static constexpr void log(std::string_view message);
 	static constexpr void log_server_error_message(const exchange::MessageHeader& header);
 
 public:

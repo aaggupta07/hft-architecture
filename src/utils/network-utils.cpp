@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <cerrno>
 
+#include <print>
+
 namespace network {
 bool set_socket_nonblocking(SocketFD socket_fd) noexcept {
 	const int flags = fcntl(socket_fd, F_GETFL, 0);
@@ -62,7 +64,7 @@ bool set_multicast_interface(SocketFD socket_fd, const in_addr& interface) noexc
 
 bool enable_udp_port_sharing(SocketFD socket_fd) noexcept {
 	// SO_REUSEADDR lets multiple processes bind to the same port
-	constexpr uint8_t MULTI_BIND = 1;
+	constexpr int MULTI_BIND = 1;
 	return setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &MULTI_BIND, sizeof(MULTI_BIND)) != INVALID;
 }
 
@@ -76,7 +78,7 @@ JoinStatus join_multicast_group(SocketFD socket_fd, const char* mcast_group) noe
 				? JoinStatus::ProcedureError : JoinStatus::Success;
 }
 
-bool resize_recv_buffer(SocketFD socket_fd, size_t new_size_in_bytes) noexcept {
+bool resize_recv_buffer(SocketFD socket_fd, int new_size_in_bytes) noexcept {
 	return setsockopt(socket_fd, SOL_SOCKET, SO_RCVBUF, &new_size_in_bytes, sizeof(new_size_in_bytes)) != INVALID;
 }
 

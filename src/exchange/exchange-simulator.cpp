@@ -25,6 +25,7 @@ void ExchangeSimulator::launch_retransmit_server(std::stop_token stop_token) {
 		if(!result) log(result.error());
 		else log("Retransmit server stopped.");
 	}
+	request_stop();
 }
 
 void ExchangeSimulator::launch_order_generator(std::stop_token stop_token) {
@@ -32,6 +33,7 @@ void ExchangeSimulator::launch_order_generator(std::stop_token stop_token) {
 	if constexpr(config::LOGGING) {
 		log("Order generator stopped.");
 	}
+	request_stop();
 }
 
 void ExchangeSimulator::run(std::stop_token stop_token) {

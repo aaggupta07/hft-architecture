@@ -9,6 +9,7 @@
 #include <expected>
 #include <algorithm>
 #include <cassert>
+#include <span>
 
 #include <sys/socket.h>
 #include <unistd.h>
@@ -112,9 +113,9 @@ public:
 
 	// Ignores `bytes` if a message was partially received - in this case, receive() 
 	// will attempt to fetch the remainder of the partially received message instead.
-	std::expected<std::array<std::byte, N>, Error> receive(size_t bytes) {
+	std::expected<std::span<std::byte>, Error> receive(size_t bytes) {
 		assert(socket_fd_ >= 0);
-		assert((connection_status_ == Status::Clear && bytes < buffer_.size()) || connection_status_ == Status::PartialReceive);
+		assert((connection_status_ == Status::Clear && bytes <= buffer_.size()) || connection_status_ == Status::PartialReceive);
 
 		if(connection_status_ == Status::Clear) {
 			head_ = bytes;
@@ -124,8 +125,11 @@ public:
 		network::ReceiveStatus status = network::recv_range(socket_fd_, buffer_, tail_, head_);
 		switch(status) {
 			case network::ReceiveStatus::Success:
-				clear();
-				return buffer_;
+				{
+					const size_t completed_size = head_;
+					clear();
+					return std::span{buffer_}.first(completed_size);
+				}
 			case network::ReceiveStatus::ConnectionClosed:
 				return std::unexpected(Error::ClientConnectionClosed);
 			case network::ReceiveStatus::Error:

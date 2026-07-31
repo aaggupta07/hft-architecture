@@ -8,6 +8,8 @@
 #include <span>
 #include <optional>
 #include <stop_token>
+#include <algorithm>
+#include <cassert>
 
 template<typename T, size_t CAPACITY>
 class ReorderBuffer {
@@ -33,7 +35,7 @@ private:
 	// to prevent false sharing. This does cost memory, especially for smaller types T.
 	struct alignas(config::CACHE_LINE_SIZE) BufferSlot {
 		T data;
-		std::atomic<Status> status;
+		std::atomic<Status> status = Status::Empty;
 	};
 
 	static constexpr size_t MASK = CAPACITY - 1;
@@ -42,7 +44,7 @@ private:
 	static constexpr size_t MAX_INDEX_AHEAD = CAPACITY - 1; 
 
 	std::array<BufferSlot, CAPACITY> buffer_;
-	std::atomic<size_t> reader_index_ = 0;
+	std::atomic<size_t> reader_index_;
 
 	static inline void wait_for_progress() noexcept {
 		#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
@@ -61,7 +63,7 @@ private:
 	
 
 public:
-	ReorderBuffer() = default;
+	ReorderBuffer(size_t initial_reader_index): reader_index_(initial_reader_index) {}
 
 	std::optional<T> 	try_consume_next();
 	T 					wait_consume_next();
@@ -69,8 +71,8 @@ public:
 
 	WriteStatus try_write_to(const T& data, size_t index);
 
-	template<typename U>
-	WriteStatus try_write_to(const std::span<const U> data, size_t index);
+	template<typename U, size_t N = std::tuple_size_v<T>>
+	WriteStatus try_write_to(const std::span<const U, N> data, size_t index);
 };
 
 template<typename T, size_t CAPACITY>
@@ -110,6 +112,7 @@ std::optional<T> ReorderBuffer<T, CAPACITY>::wait_consume_next(std::stop_token s
 		}
 		wait_for_progress();
 	}
+	return std::nullopt;
 }
 
 template<typename T, size_t CAPACITY>
@@ -128,11 +131,11 @@ template<typename T, size_t CAPACITY>
 auto ReorderBuffer<T, CAPACITY>::validate_and_claim_slot(size_t index) -> WriteStatus {
 	size_t reader_index = reader_index_.load(std::memory_order_acquire);
 	if(index >= reader_index + MAX_INDEX_AHEAD) [[unlikely]] {
-		Status status = buffer_[reader_index].status.load(std::memory_order_acquire);
+		Status status = buffer_[reader_index & MASK].status.load(std::memory_order_acquire);
 		if(status == Status::Ready) return WriteStatus::LikelySlowReader;
 		else return WriteStatus::LikelySlowWriter;
 	}
-	if(!try_claim_slot(index)) return WriteStatus::AlreadyWritten;
+	if(index < reader_index || !try_claim_slot(index)) return WriteStatus::AlreadyWritten;
 	return WriteStatus::Success;
 }
 
@@ -141,20 +144,25 @@ auto ReorderBuffer<T, CAPACITY>::try_write_to(const T& data, size_t index) -> Wr
 	WriteStatus status = validate_and_claim_slot(index);
 	if(status != WriteStatus::Success) return status;
 	
-	buffer_.data = data;
-	buffer_.status.store(Status::Ready, std::memory_order_release);
+	size_t writer_slot = index & MASK;
+	buffer_[writer_slot].data = data;
+	buffer_[writer_slot].status.store(Status::Ready, std::memory_order_release);
+	return WriteStatus::Success;
 }
 
 // Template specialization when T = std::array<V, N>
 // `data` should have size() = N and U should be type V
 template<typename T, size_t CAPACITY>
-template<typename U>
-auto ReorderBuffer<T, CAPACITY>::try_write_to(const std::span<const U> data, size_t index) -> WriteStatus {
+template<typename U, size_t N>
+auto ReorderBuffer<T, CAPACITY>::try_write_to(const std::span<const U, N> data, size_t index) -> WriteStatus {
+	assert(data.size() == std::tuple_size_v<T> && "Data size must match the size of the array type T.");
 	WriteStatus status = validate_and_claim_slot(index);
 	if(status != WriteStatus::Success) return status;
 
-	buffer_.data = data;
-	buffer_.status.store(Status::Ready, std::memory_order_release);
+	size_t writer_slot = index & MASK;
+	std::ranges::copy(data, buffer_[writer_slot].data.begin());
+	buffer_[writer_slot].status.store(Status::Ready, std::memory_order_release);
+	return WriteStatus::Success;
 }
 
 #endif

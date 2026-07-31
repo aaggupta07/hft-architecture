@@ -48,10 +48,11 @@ public:
 
 	// Requires a decoded header
 	constexpr std::span<std::byte> get_payload_ref() noexcept {
+		assert(header_.payload_length <= config::MAX_MESSAGE_BYTES);
 		return std::span{buffer_}.subspan(MessageHeader::PACKED_WIRE_SIZE, header_.payload_length);
 	}
 
-	void decode_from_header() noexcept;
+	void decode_header_from_buffer() noexcept;
 };
 
 #endif

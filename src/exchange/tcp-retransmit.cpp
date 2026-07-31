@@ -7,8 +7,7 @@
 
 #include <sys/socket.h>
 #include <sys/event.h>
-#include <fcntl.h>
-#include <netdb.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include <cerrno>
 #include <cassert>
@@ -47,37 +46,22 @@ constexpr void RetransmitServer::log(const Error& error) const {
 }
 
 auto RetransmitServer::get_listener() -> std::expected<int, Error> {
-	addrinfo hints {};
-	addrinfo* server_info = nullptr;
+	sockaddr_in server_address {};
+	server_address.sin_family = AF_INET;
+	server_address.sin_port = htons(config::RETRANSMIT_PORT);
+	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-
-	int status = getaddrinfo(nullptr, nullptr, &hints, &server_info);
-	if(status != 0) [[unlikely]] {
-		if constexpr(config::LOGGING) std::println("[TCP Retransmit] Error (getaddrinfo): {}", gai_strerror(status));
-		return std::unexpected(Error::AddressInfo);
-	}
-
-	sockaddr_in* server_address = reinterpret_cast<sockaddr_in*>(server_info->ai_addr);
-	server_address->sin_port = htons(config::RETRANSMIT_PORT);
-	
-	SocketFD new_socket = socket(server_info->ai_family, server_info->ai_socktype, 0);
+	SocketFD new_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if(new_socket == INVALID) [[unlikely]] {
-		freeaddrinfo(server_info);
 		return std::unexpected(Error::StartRetransmitServer);
 	}
 
 	if(!network::set_socket_nonblocking(new_socket)) [[unlikely]] {
 		close(new_socket);
-		freeaddrinfo(server_info);
 		return std::unexpected(Error::SetSocketNonblocking);
 	}
 
-	status = bind(new_socket, server_info->ai_addr, server_info->ai_addrlen);
-	freeaddrinfo(server_info);
-
-	if(status == INVALID) [[unlikely]] {
+	if(bind(new_socket, reinterpret_cast<const sockaddr*>(&server_address), sizeof(server_address)) == INVALID) [[unlikely]] {
 		close(new_socket);
 		return std::unexpected(Error::StartRetransmitServer);
 	}
@@ -310,7 +294,7 @@ auto RetransmitServer::stream_packets(SavedConnection& client) -> std::expected<
 }
 
 auto RetransmitServer::receive_request(SavedConnection& client) -> std::expected<void, Error> {
-	auto result = client.connection.receive(sizeof(RetransmitRequest));
+	auto result = client.connection.receive(RetransmitRequest::PACKED_SIZE);
 	if(!result) {
 		return std::unexpected(result.error());
 	}

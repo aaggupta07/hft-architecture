@@ -10,7 +10,7 @@ std::optional<exchange::RetransmitRequest> GapDetector::has_gap(const exchange::
 		new_request.last_packet = most_recent_packet_id = new_sequence_id;
 		return new_request;
 	}
-	if(new_sequence_id == most_recent_packet_id + 1) ++new_sequence_id;
+	if(new_sequence_id == most_recent_packet_id + 1) ++most_recent_packet_id;
 	return std::nullopt;
 }
 }

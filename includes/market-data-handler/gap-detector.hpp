@@ -12,9 +12,9 @@ class GapDetector {
 private:
 	SequenceID most_recent_packet_id;
 public:
-	GapDetector(SequenceID first_packet_id = exchange::config::FIRST_SEQUENCE_ID)
+	GapDetector(SequenceID first_packet_id = exchange::config::FIRST_SEQUENCE_ID - 1)
 		: most_recent_packet_id(first_packet_id) {}
-
+	
 	std::optional<exchange::RetransmitRequest> has_gap(const exchange::MessageHeader& new_packet_header);
 };
 }

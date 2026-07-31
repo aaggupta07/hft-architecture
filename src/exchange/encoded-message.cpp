@@ -10,8 +10,10 @@ auto EncodedMessage::serialize() -> const std::span<const std::byte> {
     return message();
 }
 
-void EncodedMessage::decode_from_header() noexcept {
+void EncodedMessage::decode_header_from_buffer() noexcept {
 	std::memcpy(&header_.sequence_number, buffer_.data(), sizeof(SequenceID));
 	std::memcpy(&header_.payload_length, buffer_.data() + sizeof(SequenceID), sizeof(Length));
+	header_.sequence_number = ntohll(header_.sequence_number);
+	header_.payload_length = ntohs(header_.payload_length);
 }
 }

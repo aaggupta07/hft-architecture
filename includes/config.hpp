@@ -37,7 +37,7 @@ namespace exchange::config {
 	inline constexpr Port	MCAST_PORT		= 50000;
 	
 	// Central Limit Order Book Configuration
-	inline constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 10;
+	inline constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 14;
 
 	// Encoded Message Configuration (note: a `MarketEvent` is 18 bytes large when serialized)
 	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 5;
@@ -46,7 +46,7 @@ namespace exchange::config {
 	inline constexpr uint64_t FIRST_SEQUENCE_ID = 1;
 
 	// TCP Retransmit Server Configuration
-	inline constexpr size_t 	RETRANSMIT_CACHE_SIZE 		= 1 << 10;
+	inline constexpr size_t 	RETRANSMIT_CACHE_SIZE 		= 1 << 15;
 	inline constexpr size_t 	RETRANSMIT_PORT 			= 40000;
 	inline constexpr int 		MAX_PENDING_CONNECTIONS 	= 10;
 	inline constexpr size_t 	DEFAULT_CONNECTION_BUFFERS 	= 5;
@@ -89,9 +89,9 @@ namespace exchange::config {
 	 * lazily removes filled orders. If reached, the generator will clear a large number of orders 
 	 * (either orders that were already filled or by cancelling currently resting orders) 
 	 * when it reaches the MAX_ACTIVE_ORDERS limit, so that it can continue generating new orders. */
-	inline constexpr size_t MAX_ACTIVE_ORDERS = 1 << 13;
+	inline constexpr size_t MAX_ACTIVE_ORDERS = 1 << 14;
 	// When the active order count reaches MAX_ACTIVE_ORDERS, clear until the active order count reaches PURGE_UNTIL_WHEN_FULL
-	inline constexpr size_t PURGE_UNTIL_WHEN_FULL = 1 << 12;
+	inline constexpr size_t PURGE_UNTIL_WHEN_FULL = 1 << 13;
 	// Number of orders to generate when the active order count reaches 0
 	inline constexpr size_t POPULATE_WHEN_EMPTY = 1 << 8; 
 }
@@ -101,13 +101,14 @@ namespace handler::config {
 	inline constexpr bool LOGGING = true;
 
 	// Buffer sizes
-	inline constexpr size_t UDP_PACKET_BUFFER_SIZE = 1 << 12;
-	inline constexpr size_t REORDER_BUFFER_SIZE = 1 << 13;
-	inline constexpr size_t MARKET_EVENT_BUFFER_SIZE = 1 << 13;
+	inline constexpr size_t UDP_PACKET_BUFFER_SIZE = 1 << 15;
+	inline constexpr size_t REORDER_BUFFER_SIZE = 1 << 15;
+	inline constexpr size_t MARKET_EVENT_BUFFER_SIZE = 1 << 15;
 	inline constexpr size_t RETRANSMIT_BUFFER_SIZE = 1 << 8;
 
 	// Real-Time Feed Listener
-	inline constexpr size_t LISTENER_SOCKET_BUFFER_SIZE = 8 * 1024 * 1024; // 8MB
+	// macOS specifically expects a 4-byte signed int
+	inline constexpr int LISTENER_SOCKET_BUFFER_SIZE = 8 * 1024 * 1024; // 8MB
 
 	// TCP Retransmit Client
 	inline constexpr const char* SERVER_IP = "127.0.0.1";

@@ -7,15 +7,21 @@
 #include "reorder-buffer.hpp"
 
 #include <stop_token>
+#include <print>
+#include <cstdio>
+#include <string_view>
 
 namespace handler {
 template<BinaryDecoder Decoder>
 class MarketEventPublisher {
 private:
-	using MarketEventBuffer = LazyRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_SIZE>;
-
 	MarketReorderBuffer& reorder_buffer_;
 	MarketEventBuffer& order_buffer_;
+
+	static constexpr void log(std::string_view message) {
+		std::println("[Market Event Publisher] {}", message);
+		std::fflush(stdout);
+	}
 
 public:
 	constexpr MarketEventPublisher(MarketReorderBuffer& reorder_buffer, MarketEventBuffer& order_buffer)
@@ -25,11 +31,13 @@ public:
 		while(!stop_token.stop_requested()) {
 			std::optional<SerializedMarketEvent> result = reorder_buffer_.wait_consume_next(stop_token);
 			if(!result) [[unlikely]] return;
+			if constexpr(config::LOGGING) log("Pulled packet data from reorder buffer.");
 
 			MarketEvent* slot = order_buffer_.wait_get_head_ref(stop_token);
 			if(slot == nullptr) [[unlikely]] return;
 			*slot = Decoder::decode(*result);
 			order_buffer_.publish();
+			if constexpr(config::LOGGING) log("Published market event.");
 		}
 	}
 };

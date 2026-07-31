@@ -43,12 +43,17 @@ std::expected<void, Error> RealTimeListener::initialize() {
 
 std::expected<void, Error> RealTimeListener::run(std::stop_token stop_token) {
 	while(!stop_token.stop_requested()) {
-		auto new_message = buffer_.wait_get_head_ref(stop_token);
-		if(!new_message) [[unlikely]] return {};
+		auto new_message = buffer_.try_get_head_ref();
+		if(!new_message) [[unlikely]] return std::unexpected(Error::HandlerTooSlow);
 
 		int status = recv(socket_fd_, new_message->get_buffer_ref().data(), exchange::EncodedMessage::MAX_WIRE_SIZE, 0);
 		if(status == INVALID) [[unlikely]] return std::unexpected(Error::UDPListen);
 		else if(stop_token.stop_requested()) [[unlikely]] return {};
+
+		if constexpr(config::LOGGING) {
+			static size_t count = 1;
+			std::println("[Real Time Feed Listener] Received packet {}", count++);
+		}
 
 		buffer_.publish();
 	}

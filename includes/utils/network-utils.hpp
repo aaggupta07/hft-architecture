@@ -34,7 +34,7 @@ bool set_multicast_interface(SocketFD socket_fd, const in_addr& interface) noexc
 bool enable_udp_port_sharing(SocketFD socket_fd) noexcept;
 JoinStatus join_multicast_group(SocketFD socket_fd, const char* mcast_group) noexcept;
 
-bool resize_recv_buffer(SocketFD socket_fd, size_t new_size_in_bytes) noexcept;
+bool resize_recv_buffer(SocketFD socket_fd, int new_size_in_bytes) noexcept;
 
 bool send_range(SocketFD socket_fd, const std::span<const std::byte> buffer, size_t& start, size_t end);
 // Intentional - use when the start index is not cared about

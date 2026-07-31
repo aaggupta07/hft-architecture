@@ -21,13 +21,15 @@ namespace handler {
 using SequenceID = uint64_t;
 using SerializedMarketEvent = std::array<std::byte, exchange::BinaryProtocol::BUFFER_SIZE>;
 using SerializedMarketEventSpan = const std::span<const std::byte>;
+
 using RetransmitRequestBuffer = SharedRingBuffer<exchange::RetransmitRequest, config::RETRANSMIT_BUFFER_SIZE>;
 using MarketReorderBuffer = ReorderBuffer<SerializedMarketEvent, config::REORDER_BUFFER_SIZE>;
 using PacketBuffer = LazyRingBuffer<exchange::EncodedMessage, config::UDP_PACKET_BUFFER_SIZE>;
+using MarketEventBuffer = LazyRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_SIZE>;
 
-class MulticastListener;
+class RealTimeListener;
 class GapDetector;
-class RetransmitClient;
+class RetransmitListener;
 
 template<typename Decoder>
 concept BinaryDecoder = requires(Decoder decoder, const std::span<const std::byte> serialized_data) {
