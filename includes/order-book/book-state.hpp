@@ -40,8 +40,8 @@ private:
     };
 
     OrderPool<config::MAX_CONCURRENT_ORDERS> order_pool;
-    ClosedHashMap<Order::Price, PriceLevel, config::MAX_PRICE_LEVELS> price_levels;
-    ClosedHashMap<Order::ID, RestingOrder::Index, config::MAX_CONCURRENT_ORDERS> order_map;
+    ClosedHashMap<Order::Price, PriceLevel, config::MAX_PRICE_LEVELS * 2> price_levels;
+    ClosedHashMap<Order::ID, RestingOrder::Index, config::MAX_CONCURRENT_ORDERS * 2> order_map;
     
     std::set<Order::Price, std::greater<>> bids;
     std::set<Order::Price> offers;

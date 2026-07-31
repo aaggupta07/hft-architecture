@@ -2,7 +2,6 @@
 #define EXCHANGE_SIMULATOR_HPP
 
 #include "protocol.hpp"
-#include "exchange-errors.hpp"
 
 #include "order-generator.hpp"
 #include "clob.hpp"
@@ -16,7 +15,6 @@
 #include "tcp-retransmit.hpp"
 
 #include <stop_token>
-#include <string_view>
 
 
 class exchange::ExchangeSimulator {

@@ -7,8 +7,6 @@
 #include <arpa/inet.h>
 #include <cerrno>
 
-#include <print>
-
 namespace network {
 bool set_socket_nonblocking(SocketFD socket_fd) noexcept {
 	const int flags = fcntl(socket_fd, F_GETFL, 0);

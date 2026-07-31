@@ -8,7 +8,6 @@
 
 #include <expected>
 #include <stop_token>
-#include <string_view>
 
 namespace handler {
 class RetransmitListener {

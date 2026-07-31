@@ -8,8 +8,8 @@
 
 namespace config {
 	// Order Book (BookState) Configuration
-	inline constexpr size_t MAX_PRICE_LEVELS = 1 << 10;
-    inline constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 14;
+	inline constexpr size_t MAX_PRICE_LEVELS = 1 << 13;
+    inline constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 15;
 
 	// Set to 128 bytes on Apple Silicon to avoid false sharing on performance cores,
 	// and std::hardware_destructive_interference_size on other architecture
@@ -67,9 +67,9 @@ namespace exchange::config {
 	inline constexpr size_t 	KQUEUE_TIMEOUT_NS 			= 100'000'000;
 
 	// Order Generator Configuration
-	inline constexpr double BUY_PROBABILITY 		= 0.4;
-	inline constexpr double CANCEL_PROBABILITY 		= 0.2;
-	inline constexpr double SELL_PROBABILITY 		= 0.4;
+	inline constexpr double BUY_PROBABILITY 		= 0.3;
+	inline constexpr double SELL_PROBABILITY 		= 0.3;
+	inline constexpr double CANCEL_PROBABILITY 		= 0.4;
 
 	/* Probability of an order being highly aggressive.
 	 * Highly aggressive orders cross the spread with larger price variance and larger quantity.
@@ -101,9 +101,9 @@ namespace exchange::config {
 	 * lazily removes filled orders. If reached, the generator will clear a large number of orders 
 	 * (either orders that were already filled or by cancelling currently resting orders) 
 	 * when it reaches the MAX_ACTIVE_ORDERS limit, so that it can continue generating new orders. */
-	inline constexpr size_t MAX_ACTIVE_ORDERS = 1 << 14;
+	inline constexpr size_t MAX_ACTIVE_ORDERS = 1 << 13;
 	// When the active order count reaches MAX_ACTIVE_ORDERS, clear until the active order count reaches PURGE_UNTIL_WHEN_FULL
-	inline constexpr size_t PURGE_UNTIL_WHEN_FULL = 1 << 13;
+	inline constexpr size_t PURGE_UNTIL_WHEN_FULL = 1 << 12;
 	// Number of orders to generate when the active order count reaches 0
 	inline constexpr size_t POPULATE_WHEN_EMPTY = 1 << 8; 
 }

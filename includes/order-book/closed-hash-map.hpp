@@ -54,15 +54,17 @@ private:
 
     Index probe_new(const Key& key) const {
         Index idx = hash(key);
-        while(occupied[idx] == SlotStatus::Occupied) {
+        for(size_t probes = 0; probes < CAPACITY; ++probes) {
+            if(occupied[idx] != SlotStatus::Occupied) return idx;
             idx = (idx + 1) & MASK;
         }
-        return idx;
+        return NULL_INDEX;
     }
 
     Index probe_existing(const Key& key) const {
         Index idx = hash(key);
-        while(occupied[idx] != SlotStatus::Empty) {
+        for(size_t probes = 0; probes < CAPACITY; ++probes) {
+            if(occupied[idx] == SlotStatus::Empty) return NULL_INDEX;
             if(occupied[idx] == SlotStatus::Occupied && slots[idx].key == key) {
                 return idx;
             }
@@ -75,19 +77,23 @@ private:
     Index probe_existing_and_save_tombstone(const Key& key) {
         Index idx = hash(key);
         bool is_saved = false;
+        saved = NULL_INDEX;
 
-        while(occupied[idx] != SlotStatus::Empty) {
+        for(size_t probes = 0; probes < CAPACITY; ++probes) {
+            if(occupied[idx] == SlotStatus::Empty) {
+                if(!is_saved) saved = idx;
+                return NULL_INDEX;
+            }
             if(!is_saved && occupied[idx] == SlotStatus::Tombstone) {
                 saved = idx;
                 is_saved = true;
             }
-            else if(slots[idx].key == key) {
+            else if(occupied[idx] == SlotStatus::Occupied && slots[idx].key == key) {
                 return idx;
             }
             idx = (idx + 1) & MASK;
         }
 
-        if(!is_saved) saved = idx;
         return NULL_INDEX;
     }
 
@@ -110,6 +116,7 @@ public:
 template<Hashable Key, typename Value, size_t CAPACITY>
 void ClosedHashMap<Key, Value, CAPACITY>::add(const Key& key, Value value) {
     Index slot_index = probe_new(key);
+    assert(slot_index != NULL_INDEX && "ClosedHashMap is full");
     slots[slot_index] = KeyValuePair(key, std::move(value));
     occupied[slot_index] = SlotStatus::Occupied;
 }

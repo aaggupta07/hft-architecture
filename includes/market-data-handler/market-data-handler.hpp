@@ -9,7 +9,6 @@
 #include "publisher.hpp"
 
 #include <stop_token>
-#include <string_view>
 
 namespace handler {
 class MarketDataHandler {
