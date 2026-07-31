@@ -2,8 +2,7 @@
 #define UDP_LISTENER_HPP
 
 #include "handler-errors.hpp"
-#include "lazy-ring-buffer.hpp"
-#include "encoded-message.hpp"
+#include "handler.hpp"
 
 #include <stop_token>
 #include <expected>
@@ -13,7 +12,7 @@ namespace handler {
 class RealTimeListener {
 private:
 	using SocketFD = int;
-	using PacketBuffer = LazyRingBuffer<exchange::EncodedMessage, config::UDP_PACKET_BUFFER_SIZE>;
+	
 	static constexpr int INVALID = -1;
 
 	SocketFD socket_fd_ = INVALID;

@@ -19,7 +19,7 @@
 namespace exchange {
 
 RetransmitRequest RetransmitRequest::parse(const std::span<std::byte> wire) {
-	assert(wire.size() == sizeof(RetransmitRequest));
+	assert(wire.size() == PACKED_SIZE);
 
 	RetransmitRequest request;
 	std::memcpy(&request.first_packet, wire.data(), sizeof(SequenceID));
@@ -30,8 +30,8 @@ RetransmitRequest RetransmitRequest::parse(const std::span<std::byte> wire) {
 	return request;
 }
 
-auto RetransmitRequest::serialize(const RetransmitRequest &request) {
-	std::array<std::byte, sizeof(RetransmitRequest)> buffer;
+auto RetransmitRequest::serialize(const RetransmitRequest &request) -> std::array<std::byte, PACKED_SIZE> {
+	std::array<std::byte, PACKED_SIZE> buffer;
 	RetransmitRequest network_order {
 		.first_packet = htonll(request.first_packet),
 		.last_packet = htonll(request.last_packet),
@@ -53,10 +53,14 @@ auto RetransmitServer::get_listener() -> std::expected<int, Error> {
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	int status = getaddrinfo(nullptr, config::RETRANSMIT_PORT, &hints, &server_info);
+	int status = getaddrinfo(nullptr, nullptr, &hints, &server_info);
 	if(status != 0) [[unlikely]] {
+		if constexpr(config::LOGGING) std::println("[TCP Retransmit] Error (getaddrinfo): {}", gai_strerror(status));
 		return std::unexpected(Error::AddressInfo);
 	}
+
+	sockaddr_in* server_address = reinterpret_cast<sockaddr_in*>(server_info->ai_addr);
+	server_address->sin_port = htons(config::RETRANSMIT_PORT);
 	
 	SocketFD new_socket = socket(server_info->ai_family, server_info->ai_socktype, 0);
 	if(new_socket == INVALID) [[unlikely]] {

@@ -8,10 +8,22 @@
 
 namespace handler {
 enum class Error {
+	// Real-Time Feed Listener (UDP)
 	StartUDPListener,
 	InvalidMulticastGroup,
 	UDPListen,
 
+	// Retransmit Client (TCP)
+	StartRetransmitClient,
+	InvalidRetransmitServer,
+	ConnectToRetransmitServer,
+	RetransmitServer,
+	RetransmitClientSend,
+	RetransmitClientReceive,
+
+	// Market Data Handler
+	ReaderTooFarBehind,
+	WriterTooFarBehind,
 };
 }
 
@@ -28,7 +40,31 @@ struct std::formatter<handler::Error> : std::formatter<std::string_view> {
 				name = "UDP Listen Error";
 				break;
 			case InvalidMulticastGroup:
-				name = "Invalid Multicast Group";
+				name = "Invalid Multicast Group IP";
+				break;
+			case StartRetransmitClient:
+				name = "Start Retransmit Client";
+				break;
+			case ConnectToRetransmitServer:
+				name = "Connect to Retransmit Server";
+				break;
+			case RetransmitServer:
+				name = "Retransmit Server Error";
+				break;
+			case RetransmitClientSend:
+				name = "Retransmit Client Send Error";
+				break;
+			case RetransmitClientReceive:
+				name = "Retransmit Client Receive Error";
+				break;
+			case InvalidRetransmitServer:
+				name = "Invalid Retransmit Server IP";
+				break;
+			case ReaderTooFarBehind:
+				name = "Fatal: Market data handler too far behind. Likely slow reader.";
+				break;
+			case WriterTooFarBehind:
+				name = "Fatal: Market data handler too far behind. Likely slow TCP retransmission.";
 				break;
 			default:
 				name = "Unknown Error";
@@ -38,6 +74,11 @@ struct std::formatter<handler::Error> : std::formatter<std::string_view> {
 		switch(error) {
 			case StartUDPListener:
 			case UDPListen:
+			case InvalidMulticastGroup:
+			case StartRetransmitClient:
+			case ConnectToRetransmitServer:
+			case RetransmitClientSend:
+			case RetransmitClientReceive:
 				{
 					const int error_number = errno;
 					return std::format_to(context.out(), "{} (errno {}: {})", name,

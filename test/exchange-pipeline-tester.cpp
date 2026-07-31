@@ -4,10 +4,15 @@
 #include "encoded-message.hpp"
 #include "lazy-ring-buffer.hpp"
 #include "sequencer.hpp"
+#include "tcp-connection.hpp"
 
 #include <cassert>
 #include <cstdio>
 #include <print>
+#include <thread>
+
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace {
 using Buffer = LazyRingBuffer<MarketEvent, exchange::config::MARKET_EVENT_BUFFER_CAPACITY>;
@@ -42,9 +47,50 @@ void verify_events(
 		buffer.consume();
 	}
 }
+
+void verify_lazy_ring_buffer_spsc() {
+	constexpr size_t MESSAGE_COUNT = 10'000;
+	LazyRingBuffer<size_t, 64> buffer;
+
+	std::jthread producer([&buffer] {
+		for(size_t value = 0; value < MESSAGE_COUNT; ++value) {
+			buffer.wait_get_head_ref() = value;
+			buffer.publish();
+		}
+	});
+
+	for(size_t expected = 0; expected < MESSAGE_COUNT; ++expected) {
+		size_t& value = buffer.wait_get_tail_ref();
+		assert(value == expected);
+		buffer.consume();
+	}
+}
+
+void verify_connection_move() {
+	int sockets[2];
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+
+	exchange::Connection<16> connection;
+	connection.set_socket(sockets[0]);
+	exchange::Connection<16> moved_connection(std::move(connection));
+	assert(connection.socket() == -1);
+	assert(moved_connection.socket() == sockets[0]);
+
+	const std::array<std::byte, 3> message {std::byte{1}, std::byte{2}, std::byte{3}};
+	moved_connection.save(message);
+	assert(moved_connection.send());
+
+	std::array<std::byte, message.size()> received{};
+	assert(recv(sockets[1], received.data(), received.size(), 0) == static_cast<ssize_t>(received.size()));
+	assert(received == message);
+	close(sockets[1]);
+}
 }
 
 int main() {
+	verify_lazy_ring_buffer_spsc();
+	verify_connection_move();
+
 	Buffer buffer;
 	Cache cache;
 	exchange::CentralLimitOrderBook clob(buffer);

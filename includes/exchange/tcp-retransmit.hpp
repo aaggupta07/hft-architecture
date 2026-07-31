@@ -16,11 +16,12 @@
 
 namespace exchange{
 struct RetransmitRequest {
+	static constexpr size_t PACKED_SIZE = sizeof(SequenceID) + sizeof(SequenceID);
 	SequenceID first_packet;
 	SequenceID last_packet;
 
-	static RetransmitRequest 	parse(const std::span<std::byte> wire);
-	static auto 				serialize(const RetransmitRequest& request);
+	static RetransmitRequest 					parse(const std::span<std::byte> wire);
+	static std::array<std::byte, PACKED_SIZE> 	serialize(const RetransmitRequest& request);
 };
 
 class RetransmitServer {

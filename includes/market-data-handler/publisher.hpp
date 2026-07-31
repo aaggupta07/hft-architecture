@@ -12,7 +12,6 @@ namespace handler {
 template<BinaryDecoder Decoder>
 class MarketEventPublisher {
 private:
-	using MarketReorderBuffer = ReorderBuffer<SerializedMarketEvent, config::REORDER_BUFFER_SIZE>;
 	using MarketEventBuffer = LazyRingBuffer<MarketEvent, config::MARKET_EVENT_BUFFER_SIZE>;
 
 	MarketReorderBuffer& reorder_buffer_;

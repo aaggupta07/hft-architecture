@@ -42,8 +42,13 @@ public:
     const std::span<const std::byte> serialize();
 
 	// Designed for another function (e.g. receivefrom()) to directly fill the buffer
-	constexpr std::array<std::byte, MAX_WIRE_SIZE>& get_buffer_ref() noexcept {
-		return buffer_;
+	constexpr std::span<std::byte, MAX_WIRE_SIZE> get_buffer_ref() noexcept {
+		return std::span<std::byte, MAX_WIRE_SIZE> {buffer_};
+	}
+
+	// Requires a decoded header
+	constexpr std::span<std::byte> get_payload_ref() noexcept {
+		return std::span{buffer_}.subspan(MessageHeader::PACKED_WIRE_SIZE, header_.payload_length);
 	}
 
 	void decode_from_header() noexcept;

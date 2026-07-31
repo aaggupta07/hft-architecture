@@ -3,6 +3,7 @@
 
 #include "protocol.hpp"
 #include "exchange-errors.hpp"
+#include "network-utils.hpp"
 
 #include <array>
 #include <expected>
@@ -44,7 +45,8 @@ public:
 		tail_ = other.tail_;
 		connection_status_ = other.connection_status_;
 
-		other.close();
+		other.socket_fd_ = -1;
+		other.clear();
 	}
 
 	Connection(Connection&& other) noexcept {
@@ -94,22 +96,18 @@ public:
 		
 		connection_status_ = Status::PartialSend;
 
-		int bytes_sent = 0;
-		for(; tail_ < head_; tail_ += bytes_sent) {
-			bytes_sent = ::send(socket_fd_, buffer_.data() + tail_, head_ - tail_, 0);
-			if(bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-				return std::unexpected(Error::WouldBlock);
-			}
-			else if(bytes_sent == -1 && errno == ECONNRESET) {
-				return std::unexpected(Error::ClientConnectionClosed);
-			}
-			else if(bytes_sent == -1) {
-				return std::unexpected(Error::SendToClient);
-			}
+		if(network::send_range(socket_fd_, buffer_, tail_, head_)) {
+			clear();
+			return {};
 		}
 
-		clear();
-		return {};
+		if(errno == EAGAIN || errno == EWOULDBLOCK) {
+				return std::unexpected(Error::WouldBlock);
+			}
+		if(errno == ECONNRESET) {
+			return std::unexpected(Error::ClientConnectionClosed);
+		}
+		return std::unexpected(Error::SendToClient);
 	}
 
 	// Ignores `bytes` if a message was partially received - in this case, receive() 
@@ -123,22 +121,19 @@ public:
 			connection_status_ = Status::PartialReceive;
 		} 
 
-		int bytes_received = 0;
-		for(; tail_ < head_; tail_ += bytes_received) {
-			bytes_received = recv(socket_fd_, buffer_.data() + tail_, head_ - tail_, 0);
-			if(bytes_received == 0) {
+		network::ReceiveStatus status = network::recv_range(socket_fd_, buffer_, tail_, head_);
+		switch(status) {
+			case network::ReceiveStatus::Success:
+				clear();
+				return buffer_;
+			case network::ReceiveStatus::ConnectionClosed:
 				return std::unexpected(Error::ClientConnectionClosed);
-			}
-			else if(bytes_received == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-				return std::unexpected(Error::WouldBlock);
-			}
-			else if(bytes_received == -1) {
+			case network::ReceiveStatus::Error:
+				if(errno == EAGAIN || errno == EWOULDBLOCK) return std::unexpected(Error::WouldBlock);
 				return std::unexpected(Error::ReceiveFromClient);
-			}
 		}
-
-		clear();
-		return buffer_;
+		assert(false && "Connection (receive): unreachable");
+		std::unreachable();
 	}
 };
 }

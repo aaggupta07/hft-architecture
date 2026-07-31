@@ -46,13 +46,13 @@ namespace exchange::config {
 	inline constexpr uint64_t FIRST_SEQUENCE_ID = 1;
 
 	// TCP Retransmit Server Configuration
-	inline constexpr size_t 		RETRANSMIT_CACHE_SIZE 		= 1 << 10;
-	inline constexpr const char* 	RETRANSMIT_PORT 			= "40000";
-	inline constexpr int 			MAX_PENDING_CONNECTIONS 	= 10;
-	inline constexpr size_t 		DEFAULT_CONNECTION_BUFFERS 	= 5;
-	inline constexpr size_t 		MAX_TOTAL_CONNECTIONS 		= 25;
+	inline constexpr size_t 	RETRANSMIT_CACHE_SIZE 		= 1 << 10;
+	inline constexpr size_t 	RETRANSMIT_PORT 			= 40000;
+	inline constexpr int 		MAX_PENDING_CONNECTIONS 	= 10;
+	inline constexpr size_t 	DEFAULT_CONNECTION_BUFFERS 	= 5;
+	inline constexpr size_t 	MAX_TOTAL_CONNECTIONS 		= 25;
 	// kqueue timeout: Sleeps for up to this much time before checking for a shutdown request
-	inline constexpr size_t 		KQUEUE_TIMEOUT_NS 			= 100'000'000;
+	inline constexpr size_t 	KQUEUE_TIMEOUT_NS 			= 100'000'000;
 
 	// Order Generator Configuration
 	inline constexpr double BUY_PROBABILITY 		= 0.4;
@@ -108,6 +108,9 @@ namespace handler::config {
 
 	// Real-Time Feed Listener
 	inline constexpr size_t LISTENER_SOCKET_BUFFER_SIZE = 8 * 1024 * 1024; // 8MB
+
+	// TCP Retransmit Client
+	inline constexpr const char* SERVER_IP = "127.0.0.1";
 }
 
 

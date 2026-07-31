@@ -4,6 +4,8 @@
 
 #include <print>
 #include <cerrno>
+#include <cstdio>
+#include <unistd.h>
 
 namespace handler {
 std::expected<void, Error> RealTimeListener::initialize() {
@@ -23,15 +25,16 @@ std::expected<void, Error> RealTimeListener::initialize() {
 		return std::unexpected(Error::StartUDPListener);
 	}
 
-	network::Status status = network::join_multicast_group(socket_fd_, exchange::config::MCAST_GROUP);
+	network::JoinStatus status = network::join_multicast_group(socket_fd_, exchange::config::MCAST_GROUP);
 	switch(status) {
-		case network::Status::InvalidIPAddress:
+		case network::JoinStatus::InvalidIPAddress:
 			return std::unexpected(Error::InvalidMulticastGroup);
-		case network::Status::ProcedureError:
+		case network::JoinStatus::ProcedureError:
 			return std::unexpected(Error::StartUDPListener);
-		case network::Status::Good:
+		case network::JoinStatus::Success:
 			if constexpr(config::LOGGING) {
 				std::println("[Real Time Feed Listener] Initialized.");
+				std::fflush(stdout);
 			}
 			return {};
 	}
@@ -43,7 +46,7 @@ std::expected<void, Error> RealTimeListener::run(std::stop_token stop_token) {
 		auto new_message = buffer_.wait_get_head_ref(stop_token);
 		if(!new_message) [[unlikely]] return {};
 
-		int status = recv(socket_fd_, &(new_message->get_buffer_ref()), exchange::EncodedMessage::MAX_WIRE_SIZE, 0);
+		int status = recv(socket_fd_, new_message->get_buffer_ref().data(), exchange::EncodedMessage::MAX_WIRE_SIZE, 0);
 		if(status == INVALID) [[unlikely]] return std::unexpected(Error::UDPListen);
 		else if(stop_token.stop_requested()) [[unlikely]] return {};
 
@@ -59,6 +62,12 @@ std::expected<void, Error> RealTimeListener::start(std::stop_token stop_token) {
 	}
 
 	return run(stop_token);
+}
+
+RealTimeListener::~RealTimeListener() {
+	if(socket_fd_ != INVALID) {
+		close(socket_fd_);
+	}
 }
 
 };

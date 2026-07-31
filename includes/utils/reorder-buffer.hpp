@@ -5,11 +5,19 @@
 
 #include <atomic>
 #include <array>
+#include <span>
 #include <optional>
 #include <stop_token>
 
 template<typename T, size_t CAPACITY>
 class ReorderBuffer {
+public:
+	enum class WriteStatus: uint8_t {
+		LikelySlowReader,
+		LikelySlowWriter,
+		Success,
+		AlreadyWritten,
+	};
 private:
 	static_assert((CAPACITY & (CAPACITY - 1)) == 0 && 
 		"CAPACITY must be a power of 2.");
@@ -49,16 +57,10 @@ private:
 	}
 
 	bool try_claim_slot(size_t index);
-
+	WriteStatus validate_and_claim_slot(size_t index);
+	
 
 public:
-	enum class WriteStatus: uint8_t {
-		LikelySlowReader,
-		LikelySlowWriter,
-		Success,
-		AlreadyWritten,
-	};
-
 	ReorderBuffer() = default;
 
 	std::optional<T> 	try_consume_next();
@@ -66,6 +68,9 @@ public:
 	std::optional<T>	wait_consume_next(std::stop_token stop_token);
 
 	WriteStatus try_write_to(const T& data, size_t index);
+
+	template<typename U>
+	WriteStatus try_write_to(const std::span<const U> data, size_t index);
 };
 
 template<typename T, size_t CAPACITY>
@@ -120,16 +125,34 @@ bool ReorderBuffer<T, CAPACITY>::try_claim_slot(size_t index) {
 }
 
 template<typename T, size_t CAPACITY>
-auto ReorderBuffer<T, CAPACITY>::try_write_to(const T& data, size_t index) -> WriteStatus {
+auto ReorderBuffer<T, CAPACITY>::validate_and_claim_slot(size_t index) -> WriteStatus {
 	size_t reader_index = reader_index_.load(std::memory_order_acquire);
 	if(index >= reader_index + MAX_INDEX_AHEAD) [[unlikely]] {
 		Status status = buffer_[reader_index].status.load(std::memory_order_acquire);
 		if(status == Status::Ready) return WriteStatus::LikelySlowReader;
 		else return WriteStatus::LikelySlowWriter;
 	}
-
 	if(!try_claim_slot(index)) return WriteStatus::AlreadyWritten;
+	return WriteStatus::Success;
+}
+
+template<typename T, size_t CAPACITY>
+auto ReorderBuffer<T, CAPACITY>::try_write_to(const T& data, size_t index) -> WriteStatus {
+	WriteStatus status = validate_and_claim_slot(index);
+	if(status != WriteStatus::Success) return status;
 	
+	buffer_.data = data;
+	buffer_.status.store(Status::Ready, std::memory_order_release);
+}
+
+// Template specialization when T = std::array<V, N>
+// `data` should have size() = N and U should be type V
+template<typename T, size_t CAPACITY>
+template<typename U>
+auto ReorderBuffer<T, CAPACITY>::try_write_to(const std::span<const U> data, size_t index) -> WriteStatus {
+	WriteStatus status = validate_and_claim_slot(index);
+	if(status != WriteStatus::Success) return status;
+
 	buffer_.data = data;
 	buffer_.status.store(Status::Ready, std::memory_order_release);
 }
