@@ -25,8 +25,6 @@ private:
 
 	std::stop_source stop_source_;
 
-	constexpr void log(const Error& error) const;
-	constexpr void log(std::string_view message) const;
 
 	void launch_real_time_listener	(std::stop_token stop_token);
 	void launch_market_publisher	(std::stop_token stop_token);

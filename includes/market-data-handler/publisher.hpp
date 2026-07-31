@@ -5,11 +5,9 @@
 #include "order.hpp"
 #include "lazy-ring-buffer.hpp"
 #include "reorder-buffer.hpp"
+#include "log.hpp"
 
 #include <stop_token>
-#include <print>
-#include <cstdio>
-#include <string_view>
 
 namespace handler {
 template<BinaryDecoder Decoder>
@@ -17,11 +15,6 @@ class MarketEventPublisher {
 private:
 	MarketReorderBuffer& reorder_buffer_;
 	MarketEventBuffer& order_buffer_;
-
-	static constexpr void log(std::string_view message) {
-		std::println("[Market Event Publisher] {}", message);
-		std::fflush(stdout);
-	}
 
 public:
 	constexpr MarketEventPublisher(MarketReorderBuffer& reorder_buffer, MarketEventBuffer& order_buffer)
@@ -31,13 +24,19 @@ public:
 		while(!stop_token.stop_requested()) {
 			std::optional<SerializedMarketEvent> result = reorder_buffer_.wait_consume_next(stop_token);
 			if(!result) [[unlikely]] return;
-			if constexpr(config::LOGGING) log("Pulled packet data from reorder buffer.");
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("Market Event Publisher", "Pulled packet data from reorder buffer.");
 
 			MarketEvent* slot = order_buffer_.wait_get_head_ref(stop_token);
 			if(slot == nullptr) [[unlikely]] return;
 			*slot = Decoder::decode(*result);
 			order_buffer_.publish();
-			if constexpr(config::LOGGING) log("Published market event.");
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+				logging::write<config::LOGGING>("Market Event Publisher", "Published market event.");
+			}
+			else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+				static size_t event_count = 0;
+				if(++event_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Market Event Publisher", "Published {} market events.", event_count);
+			}
 		}
 	}
 };

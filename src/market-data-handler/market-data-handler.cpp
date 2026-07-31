@@ -1,19 +1,9 @@
 #include "market-data-handler.hpp"
+#include "log.hpp"
 
 #include <thread>
-#include <print>
 
 namespace handler {
-constexpr void MarketDataHandler::log(const Error& error) const {
-	std::println("[MarketDataHandler] Error: {}", error);
-	std::fflush(stdout);
-}
-
-constexpr void MarketDataHandler::log(std::string_view message) const {
-	std::println("[MarketDataHandler] {}", message);
-	std::fflush(stdout);
-}
-
 MarketDataHandler::MarketDataHandler(MarketEventBuffer& market_event_buffer)
 	: reorder_buffer_(exchange::config::FIRST_SEQUENCE_ID),
 	udp_feed_listener_	(udp_packet_buffer_),
@@ -23,47 +13,45 @@ MarketDataHandler::MarketDataHandler(MarketEventBuffer& market_event_buffer)
 void MarketDataHandler::launch_real_time_listener(std::stop_token stop_token) {
 	auto result = udp_feed_listener_.start(stop_token);
 	if(!result) [[unlikely]] {
-		if constexpr(config::LOGGING) log(result.error());
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("MarketDataHandler", "Error: {}", result.error());
 		request_stop();
 	}
-	if constexpr(config::LOGGING) log("Real-time listener stopped.");
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("MarketDataHandler", "Real-time listener stopped.");
 }
 
 void MarketDataHandler::launch_market_publisher(std::stop_token stop_token) {
 	market_event_publisher_.run(stop_token);
-	if constexpr(config::LOGGING) log("Market event publisher stopped.");
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("MarketDataHandler", "Market event publisher stopped.");
 	request_stop();
 }
 
 void MarketDataHandler::launch_retransmit_client(std::stop_token stop_token) {
 	auto result = retransmit_client_.start(stop_token);
 	if(!result) [[unlikely]] {
-		if constexpr(config::LOGGING) log(result.error());
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("MarketDataHandler", "Error: {}", result.error());
 		request_stop();
 	}
-	if constexpr(config::LOGGING) log("Retransmit client stopped.");
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("MarketDataHandler", "Retransmit client stopped.");
 }
 
 void MarketDataHandler::run(std::stop_token stop_token) {
 	while(!stop_token.stop_requested()) {
 		exchange::EncodedMessage* new_packet = udp_packet_buffer_.wait_get_tail_ref(stop_token);
 		if(!new_packet) {
-			if constexpr(config::LOGGING) log("Stopped while waiting for a market event.");
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("MarketDataHandler", "Stopped while waiting for a market event.");
 			return;
 		}
 		// Over the real-time feed broadcast, all packets should contain real data and no error messages
 		new_packet->decode_header_from_buffer();
 
-		if constexpr(config::LOGGING) log("Pulled new UDP packet from ring buffer.");
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("MarketDataHandler", "Pulled new UDP packet from ring buffer.");
 
 		auto request = gap_detector_.has_gap(new_packet->header());
 		if(request) {
-			if constexpr(config::LOGGING) {
-				log(std::format("Gap detected, packets {} to {}", request->first_packet, request->last_packet));
-			}
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) logging::write<config::LOGGING>("MarketDataHandler", "Gap detected, packets {} to {}", request->first_packet, request->last_packet);
 			if(!retransmit_request_buffer_.try_push(*request)) [[unlikely]] {
 				// Retransmit request buffer is full
-				log(Error::RetransmitRequestBufferFull);
+				if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("MarketDataHandler", "Error: {}", Error::RetransmitRequestBufferFull);
 				request_stop();
 				return;
 			}
@@ -81,12 +69,18 @@ void MarketDataHandler::run(std::stop_token stop_token) {
 
 		// Other producer or consumer is too far behind on the reorder buffer
 		if(!result) [[unlikely]] {
-			log(result.error());
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("MarketDataHandler", "Error: {}", result.error());
 			request_stop();
 			return;
 		}
 
-		if constexpr(config::LOGGING) log("Successfully submitted packet data to reorder buffer");
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+			logging::write<config::LOGGING>("MarketDataHandler", "Submitted packet data to reorder buffer.");
+		}
+		else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+			static size_t packet_count = 0;
+			if(++packet_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("MarketDataHandler", "Submitted {} packets to the reorder buffer.", packet_count);
+		}
 	}
 }
 

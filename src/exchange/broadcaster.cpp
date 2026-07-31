@@ -2,14 +2,13 @@
 #include "config.hpp"
 #include "encoded-message.hpp"
 #include "network-utils.hpp"
+#include "log.hpp"
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <cerrno>
 #include <cassert>
-#include <cstdio>
-#include <print>
 
 namespace exchange {
 auto Broadcaster::start() -> std::expected<void, Error> {
@@ -39,10 +38,7 @@ auto Broadcaster::start() -> std::expected<void, Error> {
 		return std::unexpected(Error::StartBroadcast);
 	}
 
-	if constexpr(config::LOGGING) {
-		std::println("[Broadcaster] Started");
-		std::fflush(stdout);
-	}
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("Broadcaster", "Started.");
 
 	return {};
 }
@@ -58,9 +54,12 @@ auto Broadcaster::send(const std::span<const std::byte> message) -> std::expecte
 		return std::unexpected(Error::Send);
 	}
 
-	if constexpr(config::LOGGING) {
-		std::println("[Broadcaster] Sent message.");
-		std::fflush(stdout);
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+		logging::write<config::LOGGING>("Broadcaster", "Sent message.");
+	}
+	else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+		static size_t packet_count = 0;
+		if(++packet_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Broadcaster", "Sent {} packets.", packet_count);
 	}
 	return {};
 }

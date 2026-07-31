@@ -32,9 +32,6 @@ private:
 
 	std::expected<void, Error> run(std::stop_token stop_token);
 
-	static constexpr void log(const Error& error);
-	static constexpr void log(std::string_view message);
-	static constexpr void log_server_error_message(const exchange::MessageHeader& header);
 
 public:
 	RetransmitListener(RetransmitRequestBuffer& request_buffer, MarketReorderBuffer& reorder_buffer)

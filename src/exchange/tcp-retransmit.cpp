@@ -2,6 +2,7 @@
 #include "tcp-connection.hpp"
 #include "encoded-message.hpp"
 #include "network-utils.hpp"
+#include "log.hpp"
 
 #include <array>
 
@@ -11,8 +12,6 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cassert>
-#include <cstdio>
-#include <print>
 #include <tuple>
 
 namespace exchange {
@@ -38,11 +37,6 @@ auto RetransmitRequest::serialize(const RetransmitRequest &request) -> std::arra
 	std::memcpy(buffer.data(), &network_order.first_packet, sizeof(first_packet));
 	std::memcpy(buffer.data() + sizeof(first_packet), &network_order.last_packet, sizeof(last_packet));
 	return buffer;
-}
-
-constexpr void RetransmitServer::log(const Error& error) const {
-	std::println("[TCP Retransmit] Error: {}", error);
-	std::fflush(stdout);
 }
 
 auto RetransmitServer::get_listener() -> std::expected<int, Error> {
@@ -162,7 +156,7 @@ auto RetransmitServer::handle_new_connections() -> std::expected<void, Error> {
 			switch(result.error()) {
 				case Error::RegisterEvent: [[fallthrough]];
 				case Error::SetSocketNonblocking:
-					if constexpr(config::LOGGING) log(result.error());
+					if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("TCP Retransmit", "Error: {}", result.error());
 					[[fallthrough]];
 				case Error::NewConnection:
 					continue;
@@ -226,9 +220,7 @@ auto RetransmitServer::run_event_loop(std::stop_token stop_token) -> std::expect
 			// New event on existing connection
 			else {
 				auto result = handle_request(static_cast<SocketFD>(event.ident));
-				if constexpr(config::LOGGING) {
-					if(!result) log(result.error());
-				}
+				if(!result) [[unlikely]] if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("TCP Retransmit", "Error: {}", result.error());
 			}
 		}
 	}
@@ -248,10 +240,7 @@ auto RetransmitServer::start(std::stop_token stop_token) -> std::expected<void, 
 		return std::unexpected(Error::StartRetransmitServer);
 	}
 
-	if constexpr(config::LOGGING) {
-		std::println("[TCP Retransmit] Server started.");
-		std::fflush(stdout);
-	}
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("TCP Retransmit", "Server started.");
 	return run_event_loop(stop_token);
 }
 
@@ -299,6 +288,9 @@ auto RetransmitServer::receive_request(SavedConnection& client) -> std::expected
 		return std::unexpected(result.error());
 	}
 	client.request = RetransmitRequest::parse(*result);
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+		logging::write<config::LOGGING>("TCP Retransmit", "Received retransmit request for packets {} to {}.", client.request->first_packet, client.request->last_packet);
+	}
 	return {};
 }
 

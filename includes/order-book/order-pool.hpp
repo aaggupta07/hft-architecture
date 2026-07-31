@@ -9,8 +9,6 @@
 template<std::size_t CAPACITY>
 class OrderPool {
 private:
-    
-
     alignas (config::CACHE_LINE_SIZE) RestingOrder orders[CAPACITY];
     RestingOrder::Index free_stack[CAPACITY];
     RestingOrder::Index top_index = CAPACITY;

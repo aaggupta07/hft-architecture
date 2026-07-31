@@ -1,10 +1,8 @@
 #include "udp-listener.hpp"
 #include "network-utils.hpp"
 #include "config.hpp"
+#include "log.hpp"
 
-#include <print>
-#include <cerrno>
-#include <cstdio>
 #include <unistd.h>
 
 namespace handler {
@@ -32,10 +30,7 @@ std::expected<void, Error> RealTimeListener::initialize() {
 		case network::JoinStatus::ProcedureError:
 			return std::unexpected(Error::StartUDPListener);
 		case network::JoinStatus::Success:
-			if constexpr(config::LOGGING) {
-				std::println("[Real Time Feed Listener] Initialized.");
-				std::fflush(stdout);
-			}
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("Real Time Feed Listener", "Initialized.");
 			return {};
 	}
 }
@@ -50,9 +45,12 @@ std::expected<void, Error> RealTimeListener::run(std::stop_token stop_token) {
 		if(status == INVALID) [[unlikely]] return std::unexpected(Error::UDPListen);
 		else if(stop_token.stop_requested()) [[unlikely]] return {};
 
-		if constexpr(config::LOGGING) {
-			static size_t count = 1;
-			std::println("[Real Time Feed Listener] Received packet {}", count++);
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+			logging::write<config::LOGGING>("Real Time Feed Listener", "Received packet.");
+		}
+		else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+			static size_t packet_count = 0;
+			if(++packet_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Real Time Feed Listener", "Received {} packets.", packet_count);
 		}
 
 		buffer_.publish();

@@ -1,24 +1,10 @@
 #include "order-generator.hpp"
+#include "log.hpp"
 #include <cassert>
-#include <cstdio>
-#include <print>
 
 namespace exchange{
 std::random_device MarketRequestGenerator::rd;
 std::mt19937_64 MarketRequestGenerator::generator(MarketRequestGenerator::rd());
-
-void MarketRequestGenerator::log_error(const Error& error) {
-	std::println("[Market Request Generator] Error: {}", error);
-	std::fflush(stdout);
-}
-
-void MarketRequestGenerator::log(const OrderRequest& request) {
-	const char* type = request.type == OrderRequest::Type::Buy ? "Buy" :
-		request.type == OrderRequest::Type::Sell ? "Sell" : "Cancel";
-	std::println("[Market Request Generator] Generated {} order #{} at {} x {}.",
-		type, request.order_id, request.price, request.quantity);
-	std::fflush(stdout);
-}
 
 Order::Price MarketRequestGenerator::generate_price(OrderRequest::Type type, bool aggressive) {
 	assert(type == OrderRequest::Type::Buy || type == OrderRequest::Type::Sell);
@@ -72,12 +58,14 @@ void MarketRequestGenerator::generate_and_post_cancel_request(std::stop_token st
 		// Lazily removes orders that may have been traded against
 		if(clob_.order_exists(request.order_id)) {
 			auto result = clob_.submit(request, stop_token);
-			if(!result && config::LOGGING) [[unlikely]] {
-				log_error(result.error());
-			}
+			if(!result) [[unlikely]] if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("Market Request Generator", "Error: {}", result.error());
 
-			if constexpr(config::LOGGING) {
-				log(request);
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+				logging::write<config::LOGGING>("Market Request Generator", "Generated cancel order #{}.", request.order_id);
+			}
+			else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+				static size_t cancel_count = 0;
+				if(++cancel_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Market Request Generator", "Generated {} cancel orders.", cancel_count);
 			}
 			return;
 		}
@@ -122,16 +110,21 @@ void MarketRequestGenerator::generate_and_post_new_order_request(OrderRequest::T
 	}
 
 	auto result = clob_.submit(new_request, stop_token);
-	if(!result && config::LOGGING) [[unlikely]] {
-		log_error(result.error());
+	if(!result) [[unlikely]] {
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("Market Request Generator", "Error: {}", result.error());
 		return;
 	}
 	
 	if(*result != Order::INVALID_ORDER_ID) {
 		active_order_ids.add(*result);
 	}
-	if constexpr(config::LOGGING) {
-		log(new_request);
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+		const char* type_name = type == OrderRequest::Type::Buy ? "Buy" : "Sell";
+		logging::write<config::LOGGING>("Market Request Generator", "Generated {} order #{} at {} x {}.", type_name, new_request.order_id, new_request.price, new_request.quantity);
+	}
+	else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+		static size_t new_order_count = 0;
+		if(++new_order_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Market Request Generator", "Generated {} new orders.", new_order_count);
 	}
 }
 

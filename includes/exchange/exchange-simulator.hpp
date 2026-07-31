@@ -21,8 +21,6 @@
 
 class exchange::ExchangeSimulator {
 private:
-	constexpr void log(const Error& error) const;
-	constexpr void log(std::string_view message) const;
 	void launch_retransmit_server(std::stop_token stop_token);
 	void launch_order_generator(std::stop_token stop_token);
 

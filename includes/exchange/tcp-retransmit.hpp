@@ -61,7 +61,6 @@ private:
 			void 							close_server			() noexcept;
 
 	
-	constexpr void log(const Error& error) const;
 
 public:
 	explicit constexpr RetransmitServer(Cache& retransmit_cache)

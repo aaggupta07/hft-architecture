@@ -37,8 +37,6 @@ private:
 
 	void generate_and_post_random_order_request(std::stop_token stop_token);
 
-	static void log(const OrderRequest& order_request);
-	static void log_error(const Error& error);
 
 public:
 	explicit constexpr MarketRequestGenerator(CentralLimitOrderBook& order_book)

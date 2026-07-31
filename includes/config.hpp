@@ -22,11 +22,23 @@ namespace config {
 		#endif
 	;
 
+	// Each log setting includes all previous log messages as well.
+	// Zero performance penalty at "none" (via constexpr) - Set w/ release builds.
+	// Minimal performance penalty when set to "errors" or "minimal".
+	// Significant performance penalty with "Detailed" or "Extra".
+	enum class LogSetting {
+		None,			// No log messages. A single message is outputted when each thread stops, with the error.
+		Errors,			// Errors only - this includes non-fatal errors like a bad request.
+		Minimal,		// Occasional (e.g. 1 in 10000 orders/packets) log messages to quickly, roughly gauge throughput.
+						// The market data handler logs any TCP retransmit requests.
+		Detailed,		// A single log message at each stage of each component.
+		Flush			// Flush every log message to aid in debugging.
+	};
 }
 
 namespace exchange::config {
 	// Logging across the exchange
-	inline constexpr bool LOGGING = true;
+	inline constexpr ::config::LogSetting LOGGING = ::config::LogSetting::Minimal;
 
 	// Broadcast Configuration
 	using Port = uint16_t;
@@ -98,7 +110,7 @@ namespace exchange::config {
 
 namespace handler::config {
 	// Logging across the market data handler
-	inline constexpr bool LOGGING = true;
+	inline constexpr ::config::LogSetting LOGGING = ::config::LogSetting::Minimal;
 
 	// Buffer sizes
 	inline constexpr size_t UDP_PACKET_BUFFER_SIZE = 1 << 15;

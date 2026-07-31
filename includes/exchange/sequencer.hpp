@@ -5,11 +5,10 @@
 #include "encoded-message.hpp"
 #include "order.hpp"
 #include "config.hpp"
+#include "log.hpp"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <cstdio>
-#include <print>
 
 namespace exchange {
 template<BinaryEncoder Encoder>
@@ -33,9 +32,11 @@ EncodedMessage Sequencer<Encoder>::generate_message(const MarketEvent& event) {
 
     auto message =  EncodedMessage(header, payload);
 	message.serialize();
-	if constexpr(config::LOGGING) {
-		std::println("[Sequencer] Sequenced packet # {}.", sequencer_counter_ - 1);
-		std::fflush(stdout);
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+		logging::write<config::LOGGING>("Sequencer", "Sequenced packet # {}.", sequencer_counter_ - 1);
+	}
+	else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+		if((sequencer_counter_ - 1) % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Sequencer", "Sequenced packet # {}.", sequencer_counter_ - 1);
 	}
 
 	return message;

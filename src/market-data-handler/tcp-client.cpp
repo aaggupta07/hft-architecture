@@ -1,23 +1,12 @@
 #include "tcp-client.hpp"
 #include "network-utils.hpp"
+#include "log.hpp"
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <print>
-#include <cstdio>
 
 namespace handler {
-constexpr void RetransmitListener::log(const Error& error) {
-	std::println("[Retransmit Client] Error: {}", error);
-	std::fflush(stdout);
-}
-
-constexpr void RetransmitListener::log(std::string_view message) {
-	std::println("[Retransmit Client] {}", message);
-	std::fflush(stdout);
-}
-
 std::expected<void, Error> RetransmitListener::connect_to_server() {
 	assert(socket_fd_ >= 0);
 
@@ -36,7 +25,7 @@ std::expected<void, Error> RetransmitListener::connect_to_server() {
 	if(connect(socket_fd_, reinterpret_cast<sockaddr*>(&server_info), sizeof(server_info)) == INVALID) {
 		return std::unexpected(Error::ConnectToRetransmitServer);
 	}
-	if constexpr(config::LOGGING) log("Connected to retransmit server.");
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) logging::write<config::LOGGING>("Retransmit Client", "Connected to retransmit server.");
 
 	return {};
 }
@@ -52,12 +41,6 @@ std::expected<void, Error> RetransmitListener::send_request_to_server(const exch
 	bool send_result = network::send_range(socket_fd_, serialized_request, 0, serialized_request.size());
 	if(!send_result) return std::unexpected(Error::RetransmitClientSend);
 	return {};
-}
-
-constexpr void RetransmitListener::log_server_error_message(const exchange::MessageHeader& header) {
-	assert(header.sequence_number == 0);
-	auto error = static_cast<exchange::Error>(header.payload_length);
-	std::println("[Retransmit Client] Exchange Retransmit Server Error: {}", error);
 }
 
 std::expected<void, Error> RetransmitListener::receive_and_decode_header(exchange::EncodedMessage& new_message) {
@@ -76,9 +59,7 @@ std::expected<void, Error> RetransmitListener::receive_and_decode_header(exchang
 
 	// The server provided an error message
 	if(new_message.header().sequence_number == 0) {
-		if constexpr(config::LOGGING) {
-			log_server_error_message(new_message.header());
-		}
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("Retransmit Client", "Exchange retransmit server error: {}", static_cast<exchange::Error>(new_message.header().payload_length));
 		return std::unexpected(Error::RetransmitServer);
 	}
 
@@ -103,10 +84,7 @@ std::expected<void, Error> RetransmitListener::receive_payload(exchange::Encoded
 }
 
 std::expected<void, Error> RetransmitListener::handle_request(exchange::RetransmitRequest& request, std::stop_token stop_token) {
-	if constexpr(config::LOGGING) {
-		std::println("[Retransmit Client] Requesting packets {} to {}.", request.first_packet, request.last_packet);
-		std::fflush(stdout);
-	}
+	if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) logging::write<config::LOGGING>("Retransmit Client", "Requesting packets {} to {}.", request.first_packet, request.last_packet);
 	auto result = send_request_to_server(request);
 	if(!result) return result;
 
@@ -131,9 +109,12 @@ std::expected<void, Error> RetransmitListener::handle_request(exchange::Retransm
 			new_message.header().sequence_number
 		);
 		if(!result) return result;
-		if constexpr(config::LOGGING) {
-			std::println("[Retransmit Client] Received packet {}.", new_message.header().sequence_number);
-			std::fflush(stdout);
+		if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Detailed>) {
+			logging::write<config::LOGGING>("Retransmit Client", "Received packet {}.", new_message.header().sequence_number);
+		}
+		else if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Minimal>) {
+			static size_t packet_count = 0;
+			if(++packet_count % logging::MINIMAL_INTERVAL == 0) logging::write<config::LOGGING>("Retransmit Client", "Received {} retransmitted packets.", packet_count);
 		}
 	}
 	return {};
@@ -154,7 +135,7 @@ std::expected<void, Error> RetransmitListener::start(std::stop_token stop_token)
 	if(socket_fd_ == INVALID) {
 		auto result = initialize_and_connect();
 		if(!result) {
-			if constexpr(config::LOGGING) log(result.error());
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) logging::write<config::LOGGING>("Retransmit Client", "Error: {}", result.error());
 			return result;
 		}
 	}
