@@ -1,6 +1,7 @@
 CXX := clang++
+STACK_SIZE = 0x1000000 # 16MB
 
-INCLUDE_DIRS := includes includes/order-book includes/exchange includes/utils includes/market-data-handler
+INCLUDE_DIRS := includes includes/order-book includes/exchange includes/utils includes/market-data-handler includes/strategy-oms
 CPPFLAGS := $(addprefix -I,$(INCLUDE_DIRS)) -MMD -MP
 CXXFLAGS := -std=c++23 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined -g
 LDFLAGS := -Wl,-stack_size,0x1000000

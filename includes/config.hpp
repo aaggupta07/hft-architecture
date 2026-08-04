@@ -126,5 +126,15 @@ namespace handler::config {
 	inline constexpr const char* SERVER_IP = "127.0.0.1";
 }
 
+namespace strategy::config {
+	// Logging across the strategy processes
+	inline constexpr ::config::LogSetting LOGGING = ::config::LogSetting::Detailed;
+
+	// Buffer sizes
+	inline constexpr size_t TRADE_BUFFER_SIZE = 1 << 14;
+	
+
+}
+
 
 #endif
