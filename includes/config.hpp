@@ -148,8 +148,9 @@ namespace strategy::config {
 	// A CANCEL will be issued if the new midpoint is outside the previous midpoint +/- drift
 	inline constexpr Order::Price MAX_ALLOWED_DRIFT = 2;  
 
-	inline constexpr Order::Quantity MM_QUANTITY = 75;
+	inline constexpr Order::Quantity MARKET_MAKER_ORDER_QUANTITY = 75;
 
+	inline constexpr Order::Price MIN_BID_PRICE = 1;
 }
 
 
