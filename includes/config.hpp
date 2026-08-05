@@ -7,7 +7,7 @@
 #include <cstddef>
 
 namespace config {
-	// Order Book (BookState) Configuration
+	// Order book (BookState) configuration
 	inline constexpr size_t MAX_PRICE_LEVELS = 1 << 13;
     inline constexpr size_t MAX_CONCURRENT_ORDERS = 1 << 15;
 
@@ -29,7 +29,7 @@ namespace config {
 	enum class LogSetting {
 		None,			// No log messages. A single message is outputted when each thread stops, with the error.
 		Errors,			// Errors only - this includes non-fatal errors like a bad request.
-		Minimal,		// Occasional (e.g. 1 in 10000 orders/packets) log messages to quickly, roughly gauge throughput.
+		Minimal,		// Occasional (e.g. 1 in 5000 orders/packets) log messages to quickly, roughly gauge throughput.
 						// The market data handler logs any TCP retransmit requests.
 		Detailed,		// A single log message at each stage of each component.
 		Flush			// Flush every log message to aid in debugging.
@@ -40,7 +40,7 @@ namespace exchange::config {
 	// Logging across the exchange
 	inline constexpr ::config::LogSetting LOGGING = ::config::LogSetting::Minimal;
 
-	// Broadcast Configuration
+	// Broadcast configuration
 	using Port = uint16_t;
 	inline constexpr char	MCAST_GROUP[]	= "239.255.0.1";
 
@@ -48,16 +48,16 @@ namespace exchange::config {
 	inline constexpr char	MCAST_INTERFACE[] = "0.0.0.0";
 	inline constexpr Port	MCAST_PORT		= 50000;
 	
-	// Central Limit Order Book Configuration
+	// Central limit order book configuration
 	inline constexpr size_t MARKET_EVENT_BUFFER_CAPACITY = 1 << 14;
 
-	// Encoded Message Configuration (note: a `MarketEvent` is 18 bytes large when serialized)
+	// Encoded message configuration (note: a `MarketEvent` is 18 bytes large when serialized)
 	inline constexpr size_t MAX_MESSAGE_BYTES = 1 << 5;
 
-	// Sequencer Configuration
+	// Sequencer configuration
 	inline constexpr uint64_t FIRST_SEQUENCE_ID = 1;
 
-	// TCP Retransmit Server Configuration
+	// TCP retransmit server configuration
 	inline constexpr size_t 	RETRANSMIT_CACHE_SIZE 		= 1 << 15;
 	inline constexpr size_t 	RETRANSMIT_PORT 			= 40000;
 	inline constexpr int 		MAX_PENDING_CONNECTIONS 	= 10;
@@ -66,7 +66,7 @@ namespace exchange::config {
 	// kqueue timeout: Sleeps for up to this much time before checking for a shutdown request
 	inline constexpr size_t 	KQUEUE_TIMEOUT_NS 			= 100'000'000;
 
-	// Order Generator Configuration
+	// Order generator configuration
 	inline constexpr double BUY_PROBABILITY 		= 0.3;
 	inline constexpr double SELL_PROBABILITY 		= 0.3;
 	inline constexpr double CANCEL_PROBABILITY 		= 0.4;
@@ -118,11 +118,11 @@ namespace handler::config {
 	inline constexpr size_t MARKET_EVENT_BUFFER_SIZE = 1 << 15;
 	inline constexpr size_t RETRANSMIT_BUFFER_SIZE = 1 << 8;
 
-	// Real-Time Feed Listener
+	// Real-time feed listener
 	// macOS specifically expects a 4-byte signed int
 	inline constexpr int LISTENER_SOCKET_BUFFER_SIZE = 8 * 1024 * 1024; // 8MB
 
-	// TCP Retransmit Client
+	// TCP retransmit client
 	inline constexpr const char* SERVER_IP = "127.0.0.1";
 }
 
@@ -133,6 +133,22 @@ namespace strategy::config {
 	// Buffer sizes
 	inline constexpr size_t TRADE_BUFFER_SIZE = 1 << 14;
 	
+	// Market maker configuration
+
+	// The minimum amount (in fixed points) that a market maker should place
+	// an order above the best bid/offer
+	inline constexpr Order::Price MIN_TICK_DIFF = 1;
+
+	// The min/max spread after accounting for the tick difference
+	// These are one sided spreads, e.g. Midpoint +/- Spread
+	inline constexpr Order::Price ONE_SIDED_MIN_SPREAD = 3;
+	inline constexpr Order::Price ONE_SIDED_MAX_SPREAD = 10;
+
+	// Tolerated one-sided sway of the midpoint before a CANCEL order is issued
+	// A CANCEL will be issued if the new midpoint is outside the previous midpoint +/- drift
+	inline constexpr Order::Price MAX_ALLOWED_DRIFT = 2;  
+
+	inline constexpr Order::Quantity MM_QUANTITY = 75;
 
 }
 

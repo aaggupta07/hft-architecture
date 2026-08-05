@@ -151,9 +151,9 @@ auto BookState::add(const MarketEvent& event) -> Update {
     RestingOrder::Index order_index = order_pool.allocate(resting_order);
     order_map.add(resting_order.order.order_id, order_index);
 
-    auto result = price_levels.find_then_add(resting_order.order.price);
+    auto result = price_levels.find(resting_order.order.price);
     if(!result) {
-        price_levels.add_on_saved_index(resting_order.order.price, PriceLevel {
+        price_levels.add(resting_order.order.price, PriceLevel {
             .head = order_index,
             .tail = order_index,
             .total_quantity = resting_order.order.quantity,
@@ -237,12 +237,46 @@ auto BookState::trade(Order::ID resting_order_id, Order::Quantity quantity) -> U
 	return update;
 }
 
+auto BookState::update_quantity(Order::ID resting_order_id, Order::Quantity new_quantity) -> Update {
+	RestingOrder::Index order_index = order_map.find(resting_order_id)->get();
+	RestingOrder& resting_order = order_pool.get(order_index);
+
+	// Completely cancels the order if new_quantity is 0
+	if(new_quantity == 0) {
+		return purge_order(order_index, resting_order);
+	}
+
+	// Partial quantity update
+	PriceLevel& price_level = price_levels.find(resting_order.order.price)->get();
+	Update update;
+	if(new_quantity < resting_order.order.quantity) {
+		Order::Quantity delta = resting_order.order.quantity - new_quantity;
+		price_level.total_quantity -= delta;
+		resting_order.order.quantity = delta; 		// Mark order with delta for BBO update
+		update = update_bbo_add(resting_order.order);
+	}
+	else {
+		Order::Quantity delta = new_quantity - resting_order.order.quantity;
+		price_level.total_quantity += delta;
+		resting_order.order.quantity = delta;		// Mark order with delta for the BBO update
+		update = update_bbo_reduce(resting_order.order);
+	}
+	
+	resting_order.order.quantity = new_quantity;
+	return update;
+}
+
 auto BookState::cancel(const MarketEvent& event) -> Update {
     return cancel(event.order.order_id);
 }
 
 auto BookState::trade(const MarketEvent& event) -> Update {
     return trade(event.order.order_id, event.order.quantity);
+}
+
+// Current only supports updating quantity
+auto BookState::update(const MarketEvent& event) -> Update {
+	return update_quantity(event.order.order_id, event.order.quantity);
 }
 
 auto BookState::execute(const MarketEvent& event) -> Update {
@@ -253,6 +287,8 @@ auto BookState::execute(const MarketEvent& event) -> Update {
 			return cancel(event);
 		case MarketEvent::Type::Trade:
 			return trade(event);
+		case MarketEvent::Type::Update:
+			return update(event);
 		default:
 			assert(false && "[BookState] Execute: Unreachable");
 			std::unreachable();

@@ -73,44 +73,16 @@ private:
         return NULL_INDEX;
     }
 
-    // Saves the empty slot or first tombstone to `saved` for a future add on the same key, assuming the key doesn't exist
-    Index probe_existing_and_save_tombstone(const Key& key) {
-        Index idx = hash(key);
-        bool is_saved = false;
-        saved = NULL_INDEX;
-
-        for(size_t probes = 0; probes < CAPACITY; ++probes) {
-            if(occupied[idx] == SlotStatus::Empty) {
-                if(!is_saved) saved = idx;
-                return NULL_INDEX;
-            }
-            if(!is_saved && occupied[idx] == SlotStatus::Tombstone) {
-                saved = idx;
-                is_saved = true;
-            }
-            else if(occupied[idx] == SlotStatus::Occupied && slots[idx].key == key) {
-                return idx;
-            }
-            idx = (idx + 1) & MASK;
-        }
-
-        return NULL_INDEX;
-    }
-
 public:
     ClosedHashMap() {
         std::ranges::fill(occupied, SlotStatus::Empty);
     }
 
     void add(const Key& key, Value value);
-    void add_on_saved_index(const Key& key, Value value);
     bool remove(const Key& key);
-    void remove_on_saved_index();
 
     OptionalValue find(const Key& key);
 	ConstOptionalValue find(const Key& key) const;
-    OptionalValue find_then_add(const Key& key);
-    OptionalValue find_then_remove(const Key& key);
 };
 
 template<Hashable Key, typename Value, size_t CAPACITY>
@@ -122,24 +94,11 @@ void ClosedHashMap<Key, Value, CAPACITY>::add(const Key& key, Value value) {
 }
 
 template<Hashable Key, typename Value, size_t CAPACITY>
-void ClosedHashMap<Key, Value, CAPACITY>::add_on_saved_index(const Key& key, Value value) {
-    assert(saved != NULL_INDEX);
-    slots[saved] = KeyValuePair(key, std::move(value));
-    occupied[saved] = SlotStatus::Occupied;
-}
-
-template<Hashable Key, typename Value, size_t CAPACITY>
 bool ClosedHashMap<Key, Value, CAPACITY>::remove(const Key& key) {
     Index slot_idx = probe_existing(key);
     if(slot_idx == NULL_INDEX) return false;
     occupied[slot_idx] = SlotStatus::Tombstone;
     return true;
-}
-
-template<Hashable Key, typename Value, size_t CAPACITY>
-void ClosedHashMap<Key, Value, CAPACITY>::remove_on_saved_index() {
-    assert(saved != NULL_INDEX);
-    occupied[saved] = SlotStatus::Tombstone;
 }
 
 template<Hashable Key, typename Value, size_t CAPACITY>
@@ -154,21 +113,6 @@ auto ClosedHashMap<Key, Value, CAPACITY>::find(const Key& key) const -> ConstOpt
     Index slot_idx = probe_existing(key);
     if(slot_idx == NULL_INDEX) return std::nullopt;
 	return std::cref(slots[slot_idx].value);
-}
-
-template<Hashable Key, typename Value, size_t CAPACITY>
-auto ClosedHashMap<Key, Value, CAPACITY>::find_then_add(const Key& key) -> OptionalValue {
-    Index slot_idx = probe_existing_and_save_tombstone(key);
-    if(slot_idx == NULL_INDEX) return std::nullopt;
-    return std::ref(slots[slot_idx].value);
-}
-
-template<Hashable Key, typename Value, size_t CAPACITY>
-auto ClosedHashMap<Key, Value, CAPACITY>::find_then_remove(const Key& key) -> OptionalValue {
-    Index slot_idx = probe_existing(key);
-    saved = slot_idx;
-    if(slot_idx == NULL_INDEX) return std::nullopt;
-    return slots[slot_idx].value;
 }
 
 #endif

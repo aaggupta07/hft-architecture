@@ -31,9 +31,10 @@ struct OrderRequest {
 		Buy,
 		Sell,
 		Cancel,
+		Update,
 	};
 
-	Order::ID order_id;			// Used for CANCEL requests
+	Order::ID order_id;			// Used for CANCEL requests, or internal ClientOrderID
 	Order::Price price;			// Used for BUY/SELL requests
 	Order::Quantity quantity; 	// Used for BUY/SELL requests
 	Type type;

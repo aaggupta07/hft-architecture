@@ -21,6 +21,7 @@ private:
 	MarketEventBuffer& buffer_;
 
 	std::expected<void, Error> cancel_order(const OrderRequest& request, std::stop_token stop_token);
+	std::expected<void, Error> update_order(const OrderRequest& request, std::stop_token stop_token);
 
 	bool execute_trade(Order& new_order, std::stop_token stop_token);
 	void add_order(Order& new_order, std::stop_token stop_token);

@@ -38,6 +38,7 @@ struct MarketEvent {
 		Add,
 		Cancel,
 		Trade,
+		Update,
 	};
 
 	Order order;

@@ -1,8 +1,6 @@
 #ifndef SEQ_LOCK_HPP
 #define SEQ_LOCK_HPP
 
-#include "config.hpp"
-
 #include <atomic>
 #include <limits>
 #include <optional>

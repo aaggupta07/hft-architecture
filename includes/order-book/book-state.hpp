@@ -55,24 +55,26 @@ private:
     Update purge_order(Order::ID resting_order_id);
     Update purge_order(RestingOrder::Index order_index, const RestingOrder& resting_order);
     
-    void add_bid_or_offer(const Order& order);
-    void remove_bid_or_offer(const Order& order);
+    void add_bid_or_offer			(const Order& order);
+    void remove_bid_or_offer		(const Order& order);
 
-    Update update_bbo_add(const Order& order);
-    Update update_best_bid_add(const Order& order);
-    Update update_best_offer_add(const Order& order);
+    Update update_bbo_add			(const Order& order);
+    Update update_best_bid_add		(const Order& order);
+    Update update_best_offer_add	(const Order& order);
 
-    Update update_bbo_reduce(const Order& order);
-    Update update_best_bid_reduce(const Order& order);
-    Update update_best_offer_reduce(const Order& order);
+    Update update_bbo_reduce		(const Order& order);
+    Update update_best_bid_reduce	(const Order& order);
+    Update update_best_offer_reduce	(const Order& order);
+
+	Update cancel			(Order::ID resting_order_id);
+    Update trade			(Order::ID resting_order_id, Order::Quantity quantity);
+	Update update_quantity	(Order::ID resting_order_id, Order::Quantity quantity);
 
 public:
     Update add		(const MarketEvent& event);
     Update cancel	(const MarketEvent& event);
     Update trade	(const MarketEvent& event);
-
-    Update cancel(Order::ID resting_order_id);
-    Update trade(Order::ID resting_order_id, Order::Quantity quantity);
+	Update update 	(const MarketEvent& event);
 
 	Update execute(const MarketEvent& event);
 

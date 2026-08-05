@@ -10,9 +10,17 @@ std::expected<Order::ID, Error> CentralLimitOrderBook::submit(const OrderRequest
 		case OrderRequest::Type::Sell:
 			return sell_order(request, stop_token);
 		case OrderRequest::Type::Cancel:
-			auto result =  cancel_order(request, stop_token);
-			if(!result) return std::unexpected(result.error());
-			return Order::INVALID_ORDER_ID;
+			{
+				auto result =  cancel_order(request, stop_token);
+				if(!result) return std::unexpected(result.error());
+				return Order::INVALID_ORDER_ID;
+			}
+		case OrderRequest::Type::Update:
+			{
+				auto result = update_order(request, stop_token);
+				if(!result) return std::unexpected(result.error());
+				return request.order_id;
+			}
 	}
 }
 
@@ -40,15 +48,13 @@ bool CentralLimitOrderBook::execute_trade(Order& new_order, std::stop_token stop
 	trade->type = MarketEvent::Type::Trade;
 	buffer_.publish();
 
-	state_.execute(*trade);
+	state_.trade(*trade);
 	new_order.quantity -= quantity;
 
 	return true;
 }
 
 void CentralLimitOrderBook::add_order(Order& new_order, std::stop_token stop_token) {
-	if(stop_token.stop_requested()) [[unlikely]] return;
-	
 	MarketEvent* add =  buffer_.wait_get_head_ref(stop_token);
 	if(add == nullptr) [[unlikely]] return;
 
@@ -56,7 +62,7 @@ void CentralLimitOrderBook::add_order(Order& new_order, std::stop_token stop_tok
 	add->type = MarketEvent::Type::Add;
 	buffer_.publish();
 
-	state_.execute(*add);
+	state_.add(*add);
 }
 
 Order::ID CentralLimitOrderBook::buy_order(const OrderRequest& request, std::stop_token stop_token) {
@@ -101,16 +107,35 @@ Order::ID CentralLimitOrderBook::sell_order(const OrderRequest& request, std::st
 }
 
 std::expected<void, Error> CentralLimitOrderBook::cancel_order(const OrderRequest& request, std::stop_token stop_token) {
-	if(stop_token.stop_requested()) [[unlikely]] return {};
 	if(!state_.order_exists(request.order_id)) return std::unexpected(Error::OrderDoesNotExist);
-
-	state_.cancel(request.order_id);
 
 	MarketEvent* canceled_order = buffer_.wait_get_head_ref(stop_token);
 	if(canceled_order == nullptr) [[unlikely]] return {};
 
 	canceled_order->order = Order { .order_id = request.order_id };
 	canceled_order->type =  MarketEvent::Type::Cancel;
+	
+	state_.cancel(*canceled_order);
+
+	buffer_.publish();
+
+	return {};
+}
+
+std::expected<void, Error> CentralLimitOrderBook::update_order(const OrderRequest& request, std::stop_token stop_token) {
+	if(!state_.order_exists(request.order_id)) return std::unexpected(Error::OrderDoesNotExist);
+
+	MarketEvent* updated_order = buffer_.wait_get_head_ref(stop_token);
+	if(updated_order == nullptr) [[unlikely]] return {};
+
+	updated_order->order = Order {
+		.order_id = request.order_id,
+		.quantity = request.quantity,
+	};
+	updated_order->type = MarketEvent::Type::Update;
+
+	state_.update(*updated_order);
+
 	buffer_.publish();
 
 	return {};
