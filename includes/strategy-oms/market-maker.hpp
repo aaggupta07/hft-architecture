@@ -2,53 +2,48 @@
 #define MARKET_MAKER_HPP
 
 #include "order.hpp"
-#include "protocol.hpp"
 #include "strategy.hpp"
 
 #include <optional>
 
-// The strategy assumes that any orders it returns
-// will be placed, and must be notified otherwise
 namespace strategy {
 class PassiveMarketMaker {
 private:
-	static constexpr size_t MAX_REQUESTS = 4;
-
 	struct PlacedOrder {
-		enum class Status {
-			Placed,
-			NotPlaced,
-		};
+		enum class Status : uint8_t { NotPlaced, Placed };
 
 		Status status = Status::NotPlaced;
-		Order placed_order_;
+		Order placed_order{};
 
-		exchange::OrderRequest to_order_request() const;
+		OutboundOrderRequest new_order_request() const noexcept;
 	};
 
 	struct PricePair {
-		Order::Price bid_price_;
-		Order::Price offer_price_;
+		Order::Price bid_price;
+		Order::Price offer_price;
 	};
-	
+
 	PlacedOrder buy_order_;
 	PlacedOrder sell_order_;
+	int64_t net_filled_quantity_ = 0;
 
 	bool should_place_new_orders(const BestBidOffer& bbo) const;
 	std::optional<PricePair> price_new_order_pair(const BestBidOffer& bbo) const;
 
-	size_t get_cancel_orders(std::span<exchange::OrderRequest> order_request_buffer);
-	size_t get_new_order_pair(const BestBidOffer& bbo, 
-		std::span<exchange::OrderRequest> order_request_buffer);
-	
-	size_t update_quantity(Order::Side side, const OrderFillUpdate& order_update,
-		std::span<exchange::OrderRequest> order_request_buffer);
+	bool queue_cancel_orders(StrategyOrderBuffer& order_buffer);
+	bool queue_new_order_pair(const BestBidOffer& bbo, StrategyOrderBuffer& order_buffer);
+	bool queue_quantity_update(PlacedOrder& order, Order::Quantity quantity, StrategyOrderBuffer& order_buffer);
+
+	void rebalance_exposure(StrategyOrderBuffer& order_buffer);
+	void cancel_for_risk(const OutboundOrderRequest& rejected, StrategyOrderBuffer& order_buffer);
+
 public:
 	PassiveMarketMaker() = default;
-	
-	size_t get_orders(const BestBidOffer& bbo, std::span<exchange::OrderRequest> order_request_buffer);
-	size_t update_placed_order(const OrderFillUpdate& order_update, 
-		std::span<exchange::OrderRequest> order_request_buffer);
+
+	void get_orders		(const BestBidOffer& bbo, StrategyOrderBuffer& order_buffer);
+	void update			(const OrderFillUpdate& order_update, StrategyOrderBuffer& order_buffer);
+	void notify_invalid	(const OutboundOrderRequest& rejected, OrderStatus reason, StrategyOrderBuffer& order_buffer);
 };
 }
+
 #endif

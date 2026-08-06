@@ -131,7 +131,11 @@ namespace strategy::config {
 	inline constexpr ::config::LogSetting LOGGING = ::config::LogSetting::Detailed;
 
 	// Buffer sizes
-	inline constexpr size_t TRADE_BUFFER_SIZE = 1 << 14;
+	inline constexpr size_t TRADE_BUFFER_SIZE = 1 << 15;
+	inline constexpr size_t ORDER_UPDATE_BUFFER_SIZE = 1 << 15;
+	// Strategy-local, single-threaded staging buffer.  It must accommodate a
+	// cancel/requote batch as well as exposure rebalancing updates.
+	inline constexpr size_t STRATEGY_ORDER_BUFFER_SIZE = 1 << 5;
 	
 	// Market maker configuration
 
@@ -149,6 +153,12 @@ namespace strategy::config {
 	inline constexpr Order::Price MAX_ALLOWED_DRIFT = 2;  
 
 	inline constexpr Order::Quantity MARKET_MAKER_ORDER_QUANTITY = 75;
+	inline constexpr Order::Quantity MIN_MARKET_MAKER_ORDER_QUANTITY = 25;
+	// Start skewing quotes once fills leave this much net inventory.  The
+	// additional exit liquidity is capped so a volatile market cannot make a
+	// single quote unboundedly large.
+	inline constexpr Order::Quantity EXPOSURE_REBALANCE_THRESHOLD = 25;
+	inline constexpr Order::Quantity MAX_ADDITIONAL_EXIT_QUANTITY = 150;
 
 	inline constexpr Order::Price MIN_BID_PRICE = 1;
 }
