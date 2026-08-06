@@ -18,7 +18,9 @@ private:
 	// Set as locked when initialized to prevent readers from reading garbage data in T
 	// Only works since the SeqLock is built for a single producer
 	std::atomic<size_t> generation_ = LOCKED;
-	T data_;
+	// Reads use atomic_ref even through const SeqLock APIs.  The object is not
+	// logically mutable, but the atomic access needs a non-const referent.
+	mutable T data_;
 
 public:
 	SeqLock() = default;
@@ -91,13 +93,17 @@ public:
 	SeqLockReader(const SeqLock<T>& seq_lock)
 		: seq_lock_(seq_lock) {}
 
-	std::optional<T> wait_read_data(std::stop_token stop_token) const {
+	std::optional<T> wait_read_next(std::stop_token stop_token) const {
 		while(!stop_token.stop_requested()) {
 			size_t current_generation = seq_lock_.generation_.load(std::memory_order_acquire);
 			if(current_generation == last_generation_seen_) continue;
 			return seq_lock_.wait_read_and_update(stop_token, last_generation_seen_);
 		}
 		return std::nullopt;
+	}
+
+	std::optional<T> read_latest(std::stop_token stop_token) const {
+		return seq_lock_.wait_read(stop_token);
 	}
 };
 
