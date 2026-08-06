@@ -23,6 +23,9 @@ private:
 	T strategy_;
 
 	std::expected<void, Error> place_new_orders(std::stop_token stop_token);
+	void send_to_exchange(const exchange::OrderRequest& order_request) const {
+		std::ignore = order_request;
+	}
 	OrderStatus evaluate_risk(const OutboundOrderRequest& order, std::stop_token stop_token) const;
 	std::expected<void, Error> forward_oms_updates(std::stop_token stop_token);
 
@@ -47,14 +50,19 @@ std::expected<void, Error> Trader<T>::place_new_orders(std::stop_token stop_toke
 		const OrderStatus status = evaluate_risk(*outbound, stop_token);
 		if(status == OrderStatus::Stopped) return {};
 		if(status != OrderStatus::Good) {
-			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>)
-				logging::write<config::LOGGING>("Trader", "Rejected order #{} during risk check ({}).",
+			if constexpr(logging::enabled<config::LOGGING, ::config::LogSetting::Errors>) {
+				logging::write<config::LOGGING>(
+					"Trader", "Rejected order #{} during risk check ({}).",
 					outbound->request.order_id, static_cast<unsigned>(status));
+			}
+				
 			const OutboundOrderRequest rejected = *outbound;
 			order_buffer_.pop();
 			strategy_.notify_invalid(rejected, status, order_buffer_);
 			continue;
 		}
+
+		send_to_exchange(outbound->request);
 
 		exchange::OrderRequest* slot = trade_buffer_.try_get_head_ref();
 		if(slot == nullptr) [[unlikely]] return std::unexpected(Error::TradeBufferFull);

@@ -10,11 +10,14 @@ RELEASE_FLAGS := -O3 -flto -DNDEBUG -march=native -fomit-frame-pointer
 COMMON_SOURCE_DIRS := src/order-book src/utils
 EXCHANGE_SOURCE_DIRS := $(COMMON_SOURCE_DIRS) src/exchange
 MARKET_HANDLER_SOURCE_DIRS := $(COMMON_SOURCE_DIRS) src/market-data-handler
+STRATEGY_SOURCE_DIRS := $(COMMON_SOURCE_DIRS) src/strategy-oms
 
 EXCHANGE_SOURCES := $(foreach dir,$(EXCHANGE_SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
 MARKET_HANDLER_SOURCES := $(foreach dir,$(MARKET_HANDLER_SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
+STRATEGY_SOURCES := $(foreach dir,$(STRATEGY_SOURCE_DIRS),$(wildcard $(dir)/*.cpp))
 EXCHANGE_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(EXCHANGE_SOURCES))
 MARKET_HANDLER_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(MARKET_HANDLER_SOURCES))
+STRATEGY_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(STRATEGY_SOURCES))
 
 # The market-data handler consumes the exchange wire protocol and retransmit
 # request codec, but does not need the simulator, CLOB, or broadcaster.
@@ -25,13 +28,13 @@ MARKET_HANDLER_EXCHANGE_SOURCES := \
 	src/exchange/tcp-retransmit.cpp
 MARKET_HANDLER_EXCHANGE_OBJECTS := $(patsubst src/%.cpp,obj/%.o,$(MARKET_HANDLER_EXCHANGE_SOURCES))
 
-TEST_SOURCES := test/order-book-tester.cpp test/exchange-tester.cpp test/exchange-pipeline-tester.cpp test/market-data-handler-tester.cpp test/exchange-market-data-tester.cpp
+TEST_SOURCES := test/order-book-tester.cpp test/exchange-tester.cpp test/exchange-pipeline-tester.cpp test/market-data-handler-tester.cpp test/exchange-market-data-tester.cpp test/strategy-tester.cpp
 TEST_OBJECTS := $(patsubst test/%.cpp,obj/test/%.o,$(TEST_SOURCES))
-OBJECTS := $(sort $(EXCHANGE_OBJECTS) $(MARKET_HANDLER_OBJECTS) $(MARKET_HANDLER_EXCHANGE_OBJECTS) $(TEST_OBJECTS))
+OBJECTS := $(sort $(EXCHANGE_OBJECTS) $(MARKET_HANDLER_OBJECTS) $(MARKET_HANDLER_EXCHANGE_OBJECTS) $(STRATEGY_OBJECTS) $(TEST_OBJECTS))
 DEPENDENCIES := $(OBJECTS:.o=.d)
 INTEGRATION_OBJECTS := $(sort $(EXCHANGE_OBJECTS) $(MARKET_HANDLER_OBJECTS) $(MARKET_HANDLER_EXCHANGE_OBJECTS))
 
-.PHONY: all clean test
+.PHONY: all clean test strategy
 
 all: bin/exchange
 
@@ -63,8 +66,15 @@ bin/exchange-market-data: obj/test/exchange-market-data-tester.o $(INTEGRATION_O
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
 
+bin/strategy: obj/test/strategy-tester.o $(STRATEGY_OBJECTS)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
+
 test: bin/exchange-pipeline-test
 	bin/exchange-pipeline-test
+
+strategy: bin/strategy
+	bin/strategy
 
 clean:
 	rm -rf bin obj

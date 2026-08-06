@@ -16,7 +16,8 @@ private:
 	SeqLock<RiskData>& public_risk_data_;
 	TradeBuffer& trade_buffer_;
 	
-	bool compute_risk_adjustments(const BookState::OrderSnapshot& order_snapshot, const exchange::OrderRequest& new_order);
+	bool compute_risk_adjustments(const BookState::OrderSnapshot& order_snapshot,
+		const exchange::OrderRequest& new_order);
 
 public:
 	OrderManagementSystem(SeqLock<RiskData>& public_risk_data, TradeBuffer& trade_buffer)
